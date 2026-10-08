@@ -19,6 +19,7 @@
     this.showBars = true;
     this.highlightId = -1;
     this.caption = null;            // { title, sub }：營地預覽時蓋在戰場上的標題
+    this.commanding = false;        // 玩家正在操控主將
     this.aim = null;                // 計策瞄準預覽 { x, y, radius, color, targets }
     this.hoverChest = null;
   }
@@ -111,10 +112,46 @@
     for (var e = 0; e < battle.effects.length; e++) this.drawEffect(battle.effects[e]);
     this.drawWeather(battle);
     this.drawAim();
+    this.drawOrders(battle);
     this.drawNotices(battle);
 
     this.drawPanel(battle);
     this.drawOverlay(battle, running);
+  };
+
+  // ---- 玩家主將：操控中畫黃框；移動命令畫虛線與目的地 X，攻擊命令標出目標 ----
+  Renderer.prototype.drawOrders = function (battle) {
+    var u = battle.generals[0];
+    if (!u || u.dead) return;
+    var g = this.ctx, T = S.TILE;
+    var gx = u.posX() * T, gy = u.posY() * T;
+    var o = u.order;
+    if (o && (o.kind === 'move' || o.kind === 'attack')) {
+      var tx, ty;
+      if (o.kind === 'move') { tx = o.x * T; ty = o.y * T; } else { tx = o.target.posX() * T; ty = o.target.posY() * T; }
+      var color = o.kind === 'move' ? 'rgba(128,200,255,0.9)' : 'rgba(255,80,64,0.95)';
+      g.strokeStyle = color;
+      g.lineWidth = 1;
+      g.setLineDash([3, 2]);
+      g.beginPath();
+      g.moveTo(gx + 8, gy + 8);
+      g.lineTo(tx + 8, ty + 8);
+      g.stroke();
+      g.setLineDash([]);
+      g.beginPath();
+      if (o.kind === 'move') {
+        g.moveTo(tx + 4.5, ty + 4.5); g.lineTo(tx + 11.5, ty + 11.5);
+        g.moveTo(tx + 11.5, ty + 4.5); g.lineTo(tx + 4.5, ty + 11.5);
+      } else {
+        g.rect(tx - 0.5, ty - 0.5, T + 1, T + 1);
+      }
+      g.stroke();
+    }
+    if (this.commanding && Math.floor(Date.now() / 250) % 2 === 0) {   // 用真實時間閃爍，暫停中也看得到
+      g.strokeStyle = '#f8f040';
+      g.lineWidth = 1;
+      g.strokeRect(gx - 0.5, gy - 0.5, T + 1, T + 1);
+    }
   };
 
   // ---- 寶箱 (上下浮動、閃光)；派去撿的部隊畫一條虛線 ----
@@ -452,8 +489,6 @@
     } else if (battle.state === 'over') {
       var title = battle.winner < 0 ? '平手' : battle.winner === 0 ? '勝利！' : '敗北…';
       this.banner(title, (battle.timedOut ? '時間到 · ' : '') + '戰果請看下方');
-    } else if (!running && battle.time === 0) {
-      this.banner('三國志 · 戰鬥', '按 空白鍵 開始');
     } else if (!running) {
       this.banner('暫停');
     } else if (battle.time < 1.2) {

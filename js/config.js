@@ -236,25 +236,25 @@ window.Sango = window.Sango || {};
   };
   S.STAGES = [
     { title: '黃巾之亂', general: { name: '程遠志', hp: 45, war: 52, int: 20, lead: 30, beard: '#403020' },
-      units: ['spear', 'spear', 'archer'], lv: 0, gold: 120, exp: 100 },
+      units: ['spear', 'spear', 'archer', 'archer'], lv: 0, gold: 120, exp: 100 },
     { title: '廣宗之戰', general: { name: '張寶', hp: 55, war: 45, int: 72, lead: 45, beard: '#202020' },
-      units: ['spear', 'spear', 'archer', 'archer'], lv: 0, gold: 140, exp: 150 },
+      units: ['spear', 'spear', 'archer', 'archer', 'cavalry'], lv: 0, gold: 140, exp: 150 },
     { title: '汜水關', general: { name: '華雄', hp: 80, war: 86, int: 35, lead: 60, beard: '#282018' },
-      units: ['spear', 'spear', 'archer', 'cavalry', 'cavalry'], lv: 0, gold: 160, exp: 200 },
+      units: ['spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: 0, gold: 160, exp: 200 },
     { title: '壽春討伐', general: { name: '紀靈', hp: 75, war: 82, int: 42, lead: 70, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry'], lv: 0, gold: 180, exp: 250 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 1 }, gold: 180, exp: 250 },
     { title: '白馬之圍', general: { name: '顏良', hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
-      units: ['spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 1, spear: 1 }, gold: 200, exp: 300 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 1 }, gold: 200, exp: 300 },
     { title: '延津之戰', general: { name: '文醜', hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 1, cavalry: 1 }, gold: 220, exp: 350 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: 1, gold: 220, exp: 350 },
     { title: '合肥之戰', general: { name: '張遼', hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 1, spear: 1, archer: 1 }, gold: 240, exp: 400 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 240, exp: 400 },
     { title: '博望坡', general: { name: '夏侯惇', hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 2, archer: 1, cavalry: 2 }, gold: 260, exp: 450 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: 2, gold: 260, exp: 450 },
     { title: '樊城之戰', general: { name: '關羽', hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: 2, gold: 300, exp: 500 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 2, cavalry: 3 }, gold: 300, exp: 500 },
     { title: '虎牢關', general: { name: '呂布', hp: 98, war: 100, int: 26, lead: 85, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 3, cavalry: 4 }, gold: 500, exp: 600 }
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 4, cavalry: 5 }, gold: 500, exp: 600 }
   ];
 
   // ---- 雙方軍隊 (hp=體力 war=武力 int=智力 lead=統率；統率提升士兵防禦) ----

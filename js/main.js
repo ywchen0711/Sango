@@ -15,6 +15,7 @@
   var tacInfo = document.getElementById('tac-info');
   var tacHint = document.getElementById('tac-hint');
   var btnGeneral = document.getElementById('btn-general');
+  var btnCommand = document.getElementById('btn-command');
   var eventsEl = document.getElementById('events');
 
   var renderer = new S.Renderer(canvas);
@@ -28,7 +29,8 @@
   var SHORT = { spear: '槍', archer: '弓', cavalry: '騎' };
   var humanSide = 0;              // 玩家固定操控藍軍
   var aiming = null;              // 正在瞄準的計策 id
-  var mouseTile = null;
+  var commanding = false;         // 操控主將中：點地面移動、點敵人攻擊
+  var mouseTile = null, hoverUnit = null;
   var hintT = 0, uiT = 0, logLen = -1;
 
   function newBattle() {
@@ -38,6 +40,7 @@
     acc = 0;
     logLen = -1;
     cancelAim();
+    setCommanding(false);
     buildRoster();
     updateUI();
     updateTactics();
@@ -63,6 +66,7 @@
     btn.addEventListener('click', function () { onTactic(id); });
   });
   btnGeneral.addEventListener('click', toggleGeneral);
+  btnCommand.addEventListener('click', function () { setCommanding(!commanding); updateTactics(); });
 
   function hint(text) { tacHint.textContent = text; hintT = 2.5; }
 
@@ -74,6 +78,7 @@
     var why = battle.tacticBlocked(humanSide, id);
     if (why) { hint(S.TACTICS[id].name + '：' + why); return; }
     if (S.TACTICS[id].target) {
+      setCommanding(false);
       aiming = id;
       canvas.classList.add('aiming');
       hint('點選戰場上的目標位置施放「' + S.TACTICS[id].name + '」（右鍵 / Esc 取消）');
@@ -88,6 +93,26 @@
     aiming = null;
     renderer.aim = null;
     canvas.classList.remove('aiming');
+  }
+
+  // 操控主將模式
+  function setCommanding(on) {
+    on = on && canCommand() && battle.generalAlive(humanSide);
+    if (on && aiming) cancelAim();
+    commanding = renderer.commanding = !!on;
+    canvas.classList.toggle('commanding', commanding);
+    if (on) hint('操控' + armies[humanSide].name + '：點地面移動、點敵人攻擊（右鍵 / Esc 結束）');
+  }
+
+  function commandAt(tile, unit) {
+    var ok;
+    if (unit && unit.side !== humanSide) {
+      ok = battle.commandGeneral(humanSide, { kind: 'attack', target: unit });
+      hint(ok ? '攻擊' + unit.name + '！' : '無法攻擊');
+    } else {
+      ok = battle.commandGeneral(humanSide, { kind: 'move', x: tile.x, y: tile.y });
+      hint(ok ? '移動到指定位置' : '無法移動到那裡');
+    }
   }
 
   function toggleGeneral() {
@@ -118,6 +143,9 @@
     btnGeneral.innerHTML = (g && g.engaged ? '主將撤退' : '主將出陣') + '<kbd>Q</kbd>';
     btnGeneral.title = g && g.engaged ? '主將退回後方待機，只反擊射程內的敵人' : '主將親自上陣衝殺';
     btnGeneral.disabled = !alive || !canCommand();
+    if (commanding && (!alive || !canCommand())) setCommanding(false);
+    btnCommand.disabled = !alive || !canCommand();
+    btnCommand.classList.toggle('aiming', commanding);
     S.TACTIC_IDS.forEach(function (id) {
       var tc = S.TACTICS[id];
       var cd = battle.tacticCd[side][id] || 0;
@@ -198,32 +226,39 @@
     if (rowById[id]) rowById[id].tr.classList.add('hl');
   }
 
-  // 滑鼠指到戰場上的單位 → 表格對應列高亮；瞄準計策；指到寶箱
-  canvas.addEventListener('mousemove', function (e) {
+  // 滑鼠位置 → 戰場格子與該處的單位 (點擊時也重算，手機點擊沒有 mousemove)
+  function locate(e) {
     var lx = e.offsetX / canvas.clientWidth * S.VIEW_W;
     var ly = e.offsetY / canvas.clientHeight * S.VIEW_H;
     var tx = Math.floor(lx / S.TILE), ty = Math.floor(ly / S.TILE);
     mouseTile = battle.inBounds(tx, ty) ? { x: tx, y: ty } : null;
-    updateAim();
-    renderer.hoverChest = mouseTile && active && !aiming ? battle.chestAt(tx, ty) : null;
-    canvas.classList.toggle('pointer', !!renderer.hoverChest);
-    var found = -1;
+    hoverUnit = null;
     battle.units.forEach(function (u) {
       if (u.dead) return;
       var x = u.posX() * S.TILE, y = u.posY() * S.TILE;
-      if (lx >= x && lx < x + S.TILE && ly >= y && ly < y + S.TILE) found = u.id;
+      if (lx >= x && lx < x + S.TILE && ly >= y && ly < y + S.TILE) hoverUnit = u;
     });
-    setHighlight(found);
+  }
+
+  // 滑鼠指到戰場上的單位 → 表格對應列高亮；瞄準計策；指到寶箱 / 可操控的主將
+  canvas.addEventListener('mousemove', function (e) {
+    locate(e);
+    updateAim();
+    renderer.hoverChest = mouseTile && active && !aiming && !commanding ? battle.chestAt(mouseTile.x, mouseTile.y) : null;
+    var myGeneral = hoverUnit && hoverUnit === battle.generals[humanSide] && canCommand();
+    canvas.classList.toggle('pointer', !!renderer.hoverChest || !!myGeneral);
+    setHighlight(hoverUnit ? hoverUnit.id : -1);
   });
   canvas.addEventListener('mouseleave', function () {
     setHighlight(-1);
-    mouseTile = null;
+    mouseTile = hoverUnit = null;
     renderer.hoverChest = null;
     updateAim();
   });
 
-  // 點擊：瞄準中 → 施放計策；點到寶箱 → 派最近的士兵去撿
-  canvas.addEventListener('click', function () {
+  // 點擊：瞄準中 → 施放計策；操控主將中 → 移動 / 攻擊；點自己的主將 → 開始操控；點到寶箱 → 派最近的士兵去撿
+  canvas.addEventListener('click', function (e) {
+    locate(e);
     if (!canCommand() || !mouseTile) return;
     if (aiming) {
       if (battle.useTactic(humanSide, aiming, mouseTile.x, mouseTile.y)) { cancelAim(); hint(''); }
@@ -231,6 +266,14 @@
       updateTactics();
       return;
     }
+    var myGeneral = battle.generals[humanSide];
+    if (hoverUnit && hoverUnit === myGeneral) {
+      setCommanding(!commanding);
+      if (!commanding) hint('');
+      updateTactics();
+      return;
+    }
+    if (commanding) { commandAt(mouseTile, hoverUnit); return; }
     var chest = battle.chestAt(mouseTile.x, mouseTile.y);
     if (chest) {
       var u = battle.fetchChest(humanSide, chest);
@@ -239,6 +282,7 @@
   });
   canvas.addEventListener('contextmenu', function (e) {
     if (aiming) { e.preventDefault(); cancelAim(); hint(''); updateTactics(); }
+    else if (commanding) { e.preventDefault(); setCommanding(false); hint(''); updateTactics(); }
   });
 
   function toggle() {
@@ -301,7 +345,8 @@
         (t.tagName === 'INPUT' && t.type !== 'checkbox')) return;
     if (e.code === 'Space') { e.preventDefault(); toggle(); }
     else if (e.code === 'KeyQ') toggleGeneral();
-    else if (e.code === 'Escape') { cancelAim(); hint(''); updateTactics(); }
+    else if (e.code === 'KeyW') { setCommanding(!commanding); updateTactics(); }
+    else if (e.code === 'Escape') { cancelAim(); setCommanding(false); hint(''); updateTactics(); }
     else {
       S.TACTIC_IDS.forEach(function (id) {
         if (e.key === S.TACTICS[id].key) onTactic(id);
@@ -334,6 +379,7 @@
       active = false;
       running = false;
       cancelAim();
+      setCommanding(false);
       updateUI();
       updateTactics();
     },

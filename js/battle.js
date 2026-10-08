@@ -85,6 +85,7 @@
     this.target = null;
     this.chestGoal = null;            // 正要去開的寶箱
     this.chestForced = false;         // 玩家下令：優先於交戰
+    this.order = null;                // 玩家手動操控主將的命令
     this.charged = false;
     this.engaged = !this.isGeneral;
     this.dead = false;
@@ -273,6 +274,9 @@
   Battle.prototype.think = function (u) {
     var enemies = this.alive(1 - u.side);
     if (!enemies.length) return;
+
+    // 玩家手動下令的主將 (移動 / 攻擊 / 固守，見 tactics.js)
+    if (u.order) { this.followOrder(u, enemies); return; }
 
     // 主將：玩家操控時待命到下令出陣 (只反擊射程內的敵人)
     if (!u.engaged && this.isHuman(u.side)) {

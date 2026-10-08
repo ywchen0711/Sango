@@ -160,8 +160,55 @@
     if (!g || g.dead || this.state !== 'fighting' || g.engaged === engage) return false;
     g.engaged = engage;
     g.target = null;
+    g.order = null;
     this.addText(g, engage ? '出陣!' : '撤退!', engage ? '#f8d838' : '#80c0ff', 1.0);
     return true;
+  };
+
+  // ---- 手動操控主將 ----
+  // order：{ kind: 'move', x, y } 走到指定格 (途中不停下交戰)
+  //        { kind: 'attack', target } 追擊指定敵人
+  //        { kind: 'hold' } 原地固守，只打射程內的敵人 (抵達目的地 / 目標被擊破後自動轉為固守)
+  B.commandGeneral = function (side, order) {
+    var g = this.generals[side];
+    if (!g || g.dead || this.state !== 'fighting') return false;
+    if (order.kind === 'move' && (this.isWall(order.x, order.y) || (g.x === order.x && g.y === order.y))) return false;
+    if (order.kind === 'attack' && (!order.target || order.target.dead || order.target.side === side)) return false;
+    g.order = order;
+    g.engaged = true;
+    g.target = order.kind === 'attack' ? order.target : null;
+    g.thinkCd = 0;
+    return true;
+  };
+
+  B.followOrder = function (u, enemies) {
+    var o = u.order;
+    if (o.kind === 'attack') {
+      var t = o.target;
+      if (t.dead) { u.order = { kind: 'hold' }; u.thinkCd = 0.1; return; }
+      u.target = t;
+      if (this.inRangeAt(u, u.x, u.y, t)) {
+        if (t.x !== u.x) u.facing = t.x > u.x ? 1 : -1;
+        if (u.atkCd <= 0) this.attack(u, t);
+        u.thinkCd = 0.05;
+        return;
+      }
+      var step = this.pathStep(u, t);
+      if (step) this.moveTo(u, step.x, step.y);
+      else u.thinkCd = 0.2;
+      return;
+    }
+    if (o.kind === 'move') {
+      if (u.x === o.x && u.y === o.y) { u.order = { kind: 'hold' }; }
+      else if (!this.isFree(o.x, o.y, u) && Math.max(Math.abs(u.x - o.x), Math.abs(u.y - o.y)) <= 1) {
+        u.order = { kind: 'hold' };   // 目的地被佔住，就停在旁邊
+      } else {
+        if (!this.stepToward(u, o)) u.thinkCd = 0.2;
+        return;
+      }
+    }
+    // 固守
+    if (!this.tryAttack(u, enemies)) u.thinkCd = 0.2;
   };
 
   // ---- 電腦方 AI：依戰況決定施放計策 ----

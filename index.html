@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>三國志 自動戰鬥</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main>
+    <h1>三國志 霸王的大陸 風格 · 自動戰鬥</h1>
+    <div id="account" class="account"></div>
+    <canvas id="screen"></canvas>
+    <div class="controls">
+      <button id="btn-start">▶ 開始</button>
+      <button id="btn-restart">↻ 重新開始</button>
+      <button id="btn-random">🎲 隨機編成</button>
+      <button id="btn-draft">⚔ 選將模式</button>
+      <label>速度
+        <select id="sel-speed">
+          <option value="1">1x</option>
+          <option value="2">2x</option>
+          <option value="4">4x</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="chk-bars" checked> 兵力條</label>
+      <label>操控
+        <select id="sel-control">
+          <option value="0">藍軍</option>
+          <option value="1">紅軍</option>
+          <option value="-1">觀戰 (雙方電腦)</option>
+        </select>
+      </label>
+    </div>
+    <div id="tactics" class="tactics">
+      <span id="tac-info" class="tac-info"></span>
+      <button id="btn-general" class="tac general"></button>
+      <span id="tac-buttons"></span>
+      <span id="tac-hint" class="tac-hint"></span>
+    </div>
+    <p class="help">槍兵 剋 騎兵 · 騎兵 剋 弓兵 · 弓兵 剋 槍兵（物理）｜ 魔法：智力 vs 精神，無視相剋<br>
+      空白鍵：開始 / 暫停　R：重新開始　選將模式：雙方從亂數武將與士兵中輪流挑選　滑鼠指向單位或表格列可對照<br>
+      計策：消耗軍令（隨時間累積、擊破敵隊 +1），數字鍵 1–4 施放，火計 / 落雷需點選戰場位置（右鍵或 Esc 取消）；Q：主將出陣 / 撤退（玩家方主將不會自行出陣）<br>
+      隨機事件：寶箱（點擊可派最近的士兵去撿，可能是陷阱！）、天候變化（大風助火、大雨滅火、濃霧縮短射程）、伏兵；暫停中也可以下令</p>
+    <ol id="events" class="events"></ol>
+    <section id="draft" hidden>
+      <div class="draft-head">
+        <span id="draft-turn"></span>
+        <button id="btn-draft-auto">🎲 代選</button>
+        <button id="btn-draft-cancel">✕ 取消</button>
+      </div>
+      <div id="draft-picks"></div>
+      <h3>武將 <small>雙方各選一位</small></h3>
+      <div class="draft-table"><table id="draft-generals"></table></div>
+      <h3>士兵 <small>輪流挑選，各選五隊（防禦另受主將統率加成）</small></h3>
+      <div class="draft-table"><table id="draft-soldiers"></table></div>
+    </section>
+    <div id="roster"></div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/battle.js"></script>
+  <script src="js/tactics.js"></script>
+  <script src="js/draft.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/main.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/account.js"></script>
+</body>
+</html>

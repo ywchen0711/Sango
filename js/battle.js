@@ -124,6 +124,7 @@
     this.rng = this.seed != null ? mulberry32(this.seed) : S.random;
     this.armies = armies;
     this.levels = opts.levels || null;
+    this.autoTactics = opts.autoTactics || [false, false];   // 玩家方的計策交給電腦判斷
     this.units = [];
     this.projectiles = [];
     this.effects = [];
@@ -279,8 +280,8 @@
     // 玩家手動下令的主將 (移動 / 攻擊 / 固守，見 tactics.js)
     if (u.order) { this.followOrder(u, enemies); return; }
 
-    // 主將：玩家操控時待命到下令出陣 (只反擊射程內的敵人)
-    if (!u.engaged && this.isHuman(u.side)) {
+    // 主將：玩家按 Q 下令待命時退回後方 (只反擊射程內的敵人)；沒下令時和電腦一樣自行判斷出陣
+    if (!u.engaged && this.isHuman(u.side) && u.held) {
       if (!this.tryAttack(u, enemies)) this.walkHome(u);
       return;
     }

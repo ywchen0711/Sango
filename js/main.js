@@ -5,11 +5,11 @@
   'use strict';
 
   var canvas = document.getElementById('screen');
-  var battleBar = document.getElementById('battle-bar');
   var btnStart = document.getElementById('btn-start');
   var btnRetreat = document.getElementById('btn-retreat');
-  var selSpeed = document.getElementById('sel-speed');
+  var speedEl = document.getElementById('speed');
   var chkBars = document.getElementById('chk-bars');
+  var chkAutoTac = document.getElementById('chk-autotac');
   var roster = document.getElementById('roster');
   var tacticsEl = document.getElementById('tactics');
   var tacInfo = document.getElementById('tac-info');
@@ -34,7 +34,7 @@
   var hintT = 0, uiT = 0, logLen = -1;
 
   function newBattle() {
-    battle = S.currentBattle = new S.Battle(armies, { control: [true, false], levels: levels });   // S.currentBattle：方便在主控台除錯
+    battle = S.currentBattle = new S.Battle(armies, { control: [true, false], autoTactics: [chkAutoTac.checked, false], levels: levels });   // S.currentBattle：方便在主控台除錯
     running = false;
     overFired = false;
     acc = 0;
@@ -48,7 +48,7 @@
   }
 
   function updateUI() {
-    battleBar.hidden = !active;
+    btnStart.hidden = btnRetreat.hidden = !active;   // 速度與兵力條一直顯示，暫停 / 撤退只在戰鬥中
     btnStart.textContent = running ? '⏸ 暫停' : '▶ 繼續';
     btnStart.disabled = battle.state === 'over';
     btnRetreat.disabled = battle.state === 'over';
@@ -140,7 +140,7 @@
     tacInfo.className = 'tac-info side' + side;
     tacInfo.textContent = armies[side].name + '　軍令 ' +
       (alive ? Math.floor(battle.command[side]) : 0) + '/' + S.COMMAND.MAX;
-    btnGeneral.innerHTML = (g && g.engaged ? '主將撤退' : '主將出陣') + '<kbd>Q</kbd>';
+    btnGeneral.innerHTML = (g && g.engaged ? '主將待命' : '主將出陣') + '<kbd>Q</kbd>';
     btnGeneral.title = g && g.engaged ? '主將退回後方待機，只反擊射程內的敵人' : '主將親自上陣衝殺';
     btnGeneral.disabled = !alive || !canCommand();
     if (commanding && (!alive || !canCommand())) setCommanding(false);
@@ -330,9 +330,23 @@
     if (window.confirm('確定要撤退嗎？這場戰鬥不會獲得任何獎勵。')) { if (S.game.onRetreat) S.game.onRetreat(); }
     else { running = wasRunning; updateUI(); }
   });
-  selSpeed.addEventListener('change', function () {
-    speed = Number(selSpeed.value);
-    selSpeed.blur();
+  // 速度按鈕 (+ / − 快捷鍵切換)
+  var SPEEDS = [1, 2, 4, 8];
+  function setSpeed(v, user) {
+    speed = SPEEDS.indexOf(v) >= 0 ? v : 1;
+    Array.prototype.forEach.call(speedEl.querySelectorAll('[data-speed]'), function (b) {
+      b.classList.toggle('on', Number(b.dataset.speed) === speed);
+    });
+    if (user && S.game.onSettings) S.game.onSettings();
+  }
+  speedEl.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-speed]');
+    if (b) { setSpeed(Number(b.dataset.speed), true); b.blur(); }
+  });
+  setSpeed(1);
+  chkAutoTac.addEventListener('change', function () {
+    battle.autoTactics[0] = chkAutoTac.checked;
+    hint(chkAutoTac.checked ? '計策交給電腦判斷施放（你仍可手動施放）' : '計策改由你手動施放');
     if (S.game.onSettings) S.game.onSettings();
   });
   chkBars.addEventListener('change', function () {
@@ -341,8 +355,12 @@
   });
   document.addEventListener('keydown', function (e) {
     var t = e.target;
-    if (!active || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' ||
+    if (t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' ||
         (t.tagName === 'INPUT' && t.type !== 'checkbox')) return;
+    var si = SPEEDS.indexOf(speed);
+    if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') { setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, si + 1)], true); return; }
+    if (e.key === '-' || e.code === 'NumpadSubtract') { setSpeed(SPEEDS[Math.max(0, si - 1)], true); return; }
+    if (!active) return;
     if (e.code === 'Space') { e.preventDefault(); toggle(); }
     else if (e.code === 'KeyQ') toggleGeneral();
     else if (e.code === 'KeyW') { setCommanding(!commanding); updateTactics(); }
@@ -384,11 +402,12 @@
       updateTactics();
     },
     setCaption: function (c) { renderer.caption = c; },
-    getSettings: function () { return { speed: speed, bars: chkBars.checked }; },
+    getSettings: function () { return { speed: speed, bars: chkBars.checked, autoTactics: chkAutoTac.checked }; },
     applySettings: function (set) {
       set = set || {};
-      if (set.speed) { speed = Number(set.speed); selSpeed.value = String(speed); }
+      if (set.speed) setSpeed(Number(set.speed));
       if (set.bars != null) { chkBars.checked = !!set.bars; renderer.showBars = chkBars.checked; }
+      if (set.autoTactics != null) { chkAutoTac.checked = !!set.autoTactics; if (battle) battle.autoTactics[0] = chkAutoTac.checked; }
     }
   };
 

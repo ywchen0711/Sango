@@ -51,7 +51,7 @@
       this.globalCd[side] -= dt;
       var cds = this.tacticCd[side];
       for (var k in cds) cds[k] -= dt;
-      if (!this.isHuman(side)) {
+      if (!this.isHuman(side) || this.autoTactics[side]) {   // 玩家方可開「自動計策」交給電腦判斷
         this.aiT[side] -= dt;
         if (this.aiT[side] <= 0) { this.aiT[side] = 0.6 + this.rng() * 0.8; this.aiTactics(side); }
       }
@@ -162,6 +162,7 @@
     var g = this.generals[side];
     if (!g || g.dead || this.state !== 'fighting' || g.engaged === engage) return false;
     g.engaged = engage;
+    g.held = !engage;             // 玩家下令待命：不會自行出陣
     g.target = null;
     g.order = null;
     this.addText(g, engage ? '出陣!' : '撤退!', engage ? '#f8d838' : '#80c0ff', 1.0);

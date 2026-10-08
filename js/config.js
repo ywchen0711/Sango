@@ -240,57 +240,12 @@ window.Sango = window.Sango || {};
   // 兵種等級：每級該兵種 HP / MP / 攻擊 / 防禦 / 智力 / 精神 +BONUS
   S.LEVEL = { BONUS: 0.05, MAX: 20 };
 
-  // ---- 裝備：主將的武器 / 防具 / 寶物各一件 ----
-  // hp / war / int / lead：加到主將能力；command：開戰軍令；troops：全軍士兵能力 +%；speed：主將移動速度 +%
-  // price：商店售價 (0 = 只能從關卡取得)；value：賣出時的估價基準 (賣出得一半)
+  // ---- 裝備 (品質、詞綴、套裝、暗金的資料與邏輯在 js/items.js) ----
   S.EQUIP_SLOTS = { weapon: '武器', armor: '防具', treasure: '寶物' };
   S.EQUIP_SLOT_KEYS = ['weapon', 'armor', 'treasure'];
-  S.EQUIPMENT = {
-    ironSword:   { name: '鐵劍',       slot: 'weapon',   price: 300,  war: 5 },
-    steelSpear:  { name: '鋼槍',       slot: 'weapon',   price: 650,  war: 9 },
-    qinggang:    { name: '青釭劍',     slot: 'weapon',   price: 0, value: 1200, war: 12, int: 4 },
-    dragonBlade: { name: '青龍偃月刀', slot: 'weapon',   price: 0, value: 1600, war: 15, lead: 5 },
-    halberd:     { name: '方天畫戟',   slot: 'weapon',   price: 0, value: 2000, war: 20 },
-    leather:     { name: '皮甲',       slot: 'armor',    price: 250,  hp: 8 },
-    ironArmor:   { name: '鐵甲',       slot: 'armor',    price: 550,  hp: 12, lead: 4 },
-    brightArmor: { name: '明光鎧',     slot: 'armor',    price: 1000, hp: 18, lead: 8 },
-    artOfWar:    { name: '兵法書',     slot: 'treasure', price: 300,  int: 6 },
-    sunzi:       { name: '孫子兵法',   slot: 'treasure', price: 900,  int: 10, command: 2 },
-    warDrum:     { name: '戰鼓',       slot: 'treasure', price: 0, value: 1200, troops: 0.05 },
-    redHare:     { name: '赤兔馬',     slot: 'treasure', price: 0, value: 2000, war: 6, speed: 0.4 }
-  };
-  S.equipDesc = function (it) {
-    var parts = [];
-    S.STAT_KEYS.forEach(function (k) { if (it[k]) parts.push(S.STAT_NAMES[k] + ' +' + it[k]); });
-    if (it.command) parts.push('開戰軍令 +' + it.command);
-    if (it.troops) parts.push('全軍士兵能力 +' + Math.round(it.troops * 100) + '%');
-    if (it.speed) parts.push('主將移動速度 +' + Math.round(it.speed * 100) + '%');
-    return parts.join('、');
-  };
-  S.equipValue = function (it) { return it.price || it.value || 0; };
 
-  // 進度 → 上場的玩家軍隊 (主將能力 = 基本 + 裝備)；campaign.js 與 tools/campaign-sim.js 共用
-  S.playerArmy = function (profile) {
-    var g = profile.general;
-    var army = { name: g.name, hp: g.hp, war: g.war, int: g.int, lead: g.lead, beard: g.beard,
-                 units: profile.soldiers.slice(), commandBonus: 0, troopBonus: 0, speedBonus: 0 };
-    var equip = profile.equip || {};
-    S.EQUIP_SLOT_KEYS.forEach(function (slot) {
-      var it = S.EQUIPMENT[equip[slot]];
-      if (!it) return;
-      S.STAT_KEYS.forEach(function (k) { if (it[k]) army[k] += it[k]; });
-      army.commandBonus += it.command || 0;
-      army.troopBonus += it.troops || 0;
-      army.speedBonus += it.speed || 0;
-    });
-    return army;
-  };
-  S.playerLevels = function (profile) {
-    var l = profile.levels;
-    return { general: 0, spear: l.spear, archer: l.archer, cavalry: l.cavalry };
-  };
-
-  // 關卡：general 敵將能力，units 敵軍士兵，gold / exp 首次過關獎勵，drops 首次過關獲得的裝備
+  // 關卡：general 敵將能力，units 敵軍士兵，gold / exp 首次過關獎勵
+  // drops 首次過關額外獲得的裝備：{ quality: 'rare' } 隨機稀有、{ unique: id } 暗金、{ set: id } 套裝 (見 js/items.js)
   // lv 敵軍等級：數字 = 全體同等級；也可以分別指定 { general, spear, archer, cavalry }
   S.stageLevels = function (st) {
     if (typeof st.lv === 'object') return Object.assign({ general: 0, spear: 0, archer: 0, cavalry: 0 }, st.lv);
@@ -302,21 +257,21 @@ window.Sango = window.Sango || {};
     { title: '廣宗之戰', general: { name: '張寶', hp: 55, war: 45, int: 72, lead: 45, beard: '#202020' },
       units: ['spear', 'spear', 'archer', 'archer', 'cavalry'], lv: 0, gold: 140, exp: 150 },
     { title: '汜水關', general: { name: '華雄', hp: 80, war: 86, int: 35, lead: 60, beard: '#282018' },
-      units: ['spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: 0, gold: 160, exp: 200, drops: ['ironArmor'] },
+      units: ['spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 1 }, gold: 160, exp: 200, drops: [{ quality: 'rare' }] },
     { title: '壽春討伐', general: { name: '紀靈', hp: 75, war: 82, int: 42, lead: 70, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 1, spear: 1 }, gold: 180, exp: 250 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 180, exp: 250 },
     { title: '白馬之圍', general: { name: '顏良', hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2 }, gold: 200, exp: 300 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, cavalry: 1 }, gold: 200, exp: 300, drops: [{ unique: 'dilu' }] },
     { title: '延津之戰', general: { name: '文醜', hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 2 }, gold: 220, exp: 350, drops: ['warDrum'] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 2 }, gold: 220, exp: 350, drops: [{ unique: 'warDrum' }] },
     { title: '合肥之戰', general: { name: '張遼', hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 2, cavalry: 2 }, gold: 240, exp: 400 },
     { title: '博望坡', general: { name: '夏侯惇', hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 4 }, gold: 260, exp: 450, drops: ['qinggang'] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 3, archer: 2, cavalry: 3 }, gold: 260, exp: 450, drops: [{ unique: 'qinggang' }] },
     { title: '樊城之戰', general: { name: '關羽', hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 4, cavalry: 4 }, gold: 300, exp: 500, drops: ['dragonBlade'] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 4, archer: 3, cavalry: 4 }, gold: 300, exp: 500, drops: [{ set: 'dragonBlade' }] },
     { title: '虎牢關', general: { name: '呂布', hp: 98, war: 100, int: 26, lead: 85, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 6, spear: 6, archer: 5, cavalry: 6 }, gold: 500, exp: 600, drops: ['halberd', 'redHare'] }
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 6, spear: 6, archer: 5, cavalry: 6 }, gold: 500, exp: 600, drops: [{ set: 'halberd' }, { set: 'redHare' }] }
   ];
 
   // ---- 雙方軍隊 (hp=體力 war=武力 int=智力 lead=統率；統率提升士兵防禦) ----

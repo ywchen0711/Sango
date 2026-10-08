@@ -16,7 +16,7 @@ body {
 }
 
 main {
-  max-width: 800px;
+  max-width: 1056px;
   margin: 0 auto;
   padding: 16px;
   display: flex;
@@ -29,8 +29,8 @@ h1 { font-size: 20px; margin: 4px 0; letter-spacing: 1px; }
 
 canvas {
   width: 100%;
-  max-width: 768px;
-  aspect-ratio: 256 / 240;
+  max-width: 1024px;
+  aspect-ratio: 512 / 416;
   image-rendering: pixelated;
   border: 4px solid #000;
   background: #000;
@@ -219,3 +219,20 @@ canvas.pointer { cursor: pointer; }
 .account .acc-note { color: var(--muted); }
 .account .acc-msg { color: var(--muted); }
 .account .acc-msg.error { color: #ff7a7a; }
+
+/* ---- 裝備 ---- */
+.box.wide { grid-column: 1 / -1; }
+.box h4 { font-size: 14px; margin: 4px 0 0; color: var(--muted); font-weight: normal; }
+.equip-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.slot { border: 1px solid #3a3a4a; border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
+.slot-name { color: var(--muted); font-size: 12px; }
+.item { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 14px; }
+.item .iname { color: #f8d838; min-width: 5em; }
+.item .idesc { color: var(--muted); font-size: 13px; flex: 1; min-width: 10em; }
+.item .ibtns { display: flex; gap: 4px; align-items: center; }
+.item button { padding: 3px 9px; }
+.slot .item { flex-direction: column; align-items: flex-start; }
+.slot-tag { color: var(--muted); font-size: 12px; }
+.camp-head .plus { color: #80e0ff; margin-left: 2px; }
+.result .drop { color: #f8d838; }
+@media (max-width: 600px) { .equip-slots { grid-template-columns: 1fr; } }

@@ -63,6 +63,8 @@
       profile.gold = Number(profile.gold) || 0;
       profile.exp = Number(profile.exp) || 0;
       profile.cleared = Math.min(S.STAGES.length, Number(profile.cleared) || 0);
+      profile.items = (profile.items || []).filter(function (id) { return S.EQUIPMENT[id]; });
+      profile.equip = Object.assign({ weapon: null, armor: null, treasure: null }, profile.equip);
       S.game.applySettings(profile.settings);
       stageIdx = Math.min(profile.cleared, S.STAGES.length - 1);
       campMsg = '';
@@ -155,6 +157,8 @@
                    beard: document.getElementById('cr-beard').value || null },
         soldiers: soldiers,
         levels: { spear: 0, archer: 0, cavalry: 0 },
+        items: [],                  // 背包裡 (未裝備) 的裝備
+        equip: { weapon: null, armor: null, treasure: null },
         gold: C.START_GOLD,
         exp: 0,
         cleared: 0,
@@ -171,12 +175,8 @@
   }
 
   // ======================= 營地 =======================
-  function playerArmy() {
-    return Object.assign({}, profile.general, { units: profile.soldiers.slice() });
-  }
-  function playerLevels() {
-    return { general: 0, spear: profile.levels.spear, archer: profile.levels.archer, cavalry: profile.levels.cavalry };
-  }
+  function playerArmy() { return S.playerArmy(profile); }
+  function playerLevels() { return S.playerLevels(profile); }
   function enemyArmy(st) {
     return Object.assign({}, st.general, { units: st.units.slice() });
   }
@@ -187,6 +187,43 @@
     return '主將Lv' + lv.general + ' 槍Lv' + lv.spear + ' 弓Lv' + lv.archer + ' 騎Lv' + lv.cavalry;
   }
   function stageLabel(i) { return '第 ' + (i + 1) + ' 關 ' + S.STAGES[i].title; }
+
+  // 裝備：目前裝備的三件、背包、商店
+  function itemLine(id, buttons) {
+    var it = S.EQUIPMENT[id];
+    return '<div class="item"><span class="iname">' + it.name + '</span>' +
+      '<span class="idesc">' + S.equipDesc(it) + '</span><span class="ibtns">' + buttons + '</span></div>';
+  }
+  // 把背包第 i 件裝上，原本那一欄的裝備放回背包
+  function equipItem(i) {
+    var id = profile.items[i], slot = S.EQUIPMENT[id].slot;
+    profile.items.splice(i, 1);
+    if (profile.equip[slot]) profile.items.push(profile.equip[slot]);
+    profile.equip[slot] = id;
+  }
+  function sellPrice(id) { return Math.floor(S.equipValue(S.EQUIPMENT[id]) * C.SELL_RATE); }
+
+  function renderEquipBox() {
+    var shop = Object.keys(S.EQUIPMENT).filter(function (id) { return S.EQUIPMENT[id].price > 0; });
+    return '<div class="box wide"><h3>裝備 <small>主將的武器 / 防具 / 寶物</small></h3>' +
+      '<div class="equip-slots">' + S.EQUIP_SLOT_KEYS.map(function (slot) {
+        var id = profile.equip[slot];
+        return '<div class="slot"><span class="slot-name">' + S.EQUIP_SLOTS[slot] + '</span>' +
+          (id ? itemLine(id, '<button data-unequip="' + slot + '">卸下</button>') : '<span class="muted">（無）</span>') + '</div>';
+      }).join('') + '</div>' +
+      '<h4>背包 <small>' + profile.items.length + ' 件</small></h4>' +
+      (profile.items.length ? profile.items.map(function (id, i) {
+        return itemLine(id, '<button data-equip="' + i + '">裝備</button>' +
+          '<button data-sellitem="' + i + '">賣出<small>' + sellPrice(id) + ' 金</small></button>');
+      }).join('') : '<p class="hint">還沒有裝備。可以在下方商店購買，部分關卡首次過關也會獲得裝備</p>') +
+      '<h4>商店</h4>' +
+      shop.map(function (id) {
+        var it = S.EQUIPMENT[id];
+        return itemLine(id, '<span class="slot-tag">' + S.EQUIP_SLOTS[it.slot] + '</span>' +
+          '<button data-buyitem="' + id + '"' + (profile.gold < it.price ? ' disabled' : '') + '>購買<small>' + it.price + ' 金</small></button>');
+      }).join('') +
+      '</div>';
+  }
 
   function preview() {
     var st = S.STAGES[stageIdx];
@@ -202,11 +239,13 @@
     var count = { spear: 0, archer: 0, cavalry: 0 };
     profile.soldiers.forEach(function (t) { count[t]++; });
     var full = profile.soldiers.length >= C.MAX_UNITS;
+    var army = playerArmy();          // 含裝備加成
 
     campEl.innerHTML =
       '<div class="camp-head">' +
         '<div class="gen"><b>' + esc(g.name) + '</b> ' + S.STAT_KEYS.map(function (k) {
-          return '<span>' + S.STAT_NAMES[k] + ' ' + g[k] + '</span>';
+          var plus = army[k] - g[k];
+          return '<span>' + S.STAT_NAMES[k] + ' ' + army[k] + (plus ? '<small class="plus">(+' + plus + ')</small>' : '') + '</span>';
         }).join('') + '</div>' +
         '<div class="res"><span class="gold">💰 ' + profile.gold + ' 金</span>' +
           '<span class="exp">⭐ ' + profile.exp + ' 經驗</span>' +
@@ -230,6 +269,7 @@
             return n ? unitName(k) + '×' + n : '';
           }).filter(Boolean).join(' ') + (levelText(st) ? '　' + levelText(st) : '') + '<br>' +
           '獎勵 💰 ' + Math.round(st.gold * rate) + ' 金 ⭐ ' + Math.round(st.exp * rate) + ' 經驗' +
+          (first && st.drops ? '　🎁 ' + st.drops.map(function (id) { return S.EQUIPMENT[id].name; }).join('、') : '') +
           (first ? '' : '<small>（重打 ' + Math.round(C.REPLAY_RATE * 100) + '%）</small>') +
         '</div>' +
         '<button id="btn-go" class="primary big">⚔ 出征</button>' +
@@ -266,6 +306,7 @@
           }).join('') +
           '</tbody></table>' +
         '</div>' +
+        renderEquipBox() +
       '</div>' +
       '<div class="camp-foot"><button id="btn-reset" class="danger">重新建立武將</button></div>';
 
@@ -306,6 +347,33 @@
       profile.exp -= C2.LEVEL_COST;
       profile.levels[d.lv]++;
       campMsg = unitName(d.lv) + ' 升到 Lv' + profile.levels[d.lv];
+      save();
+    } else if (d.buyitem) {
+      var bi = S.EQUIPMENT[d.buyitem];
+      if (!bi || !bi.price || profile.gold < bi.price) return;
+      profile.gold -= bi.price;
+      profile.items.push(d.buyitem);
+      if (!profile.equip[bi.slot]) equipItem(profile.items.length - 1);   // 該欄位空著就直接裝上
+      campMsg = '購買了' + bi.name;
+      save();
+    } else if (d.equip != null) {
+      var ei = S.EQUIPMENT[profile.items[Number(d.equip)]];
+      equipItem(Number(d.equip));
+      campMsg = '裝備了' + ei.name;
+      save();
+    } else if (d.unequip) {
+      var uid = profile.equip[d.unequip];
+      if (!uid) return;
+      profile.items.push(uid);
+      profile.equip[d.unequip] = null;
+      campMsg = '卸下了' + S.EQUIPMENT[uid].name;
+      save();
+    } else if (d.sellitem != null) {
+      var sid = profile.items[Number(d.sellitem)], gain = sellPrice(sid);
+      if (!window.confirm('賣掉' + S.EQUIPMENT[sid].name + '，獲得 ' + gain + ' 金？')) return;
+      profile.items.splice(Number(d.sellitem), 1);
+      profile.gold += gain;
+      campMsg = '賣掉' + S.EQUIPMENT[sid].name + '，獲得 ' + gain + ' 金';
       save();
     } else if (b.id === 'btn-go') {
       startBattle();
@@ -362,6 +430,12 @@
     }
     profile.gold += gold;
     profile.exp += exp;
+    // 首次過關獲得裝備 (該欄位空著就直接裝上)
+    var drops = win && first ? (st.drops || []).filter(function (id) { return S.EQUIPMENT[id]; }) : [];
+    drops.forEach(function (id) {
+      profile.items.push(id);
+      if (!profile.equip[S.EQUIPMENT[id].slot]) equipItem(profile.items.length - 1);
+    });
     save();
 
     var unlock = '';
@@ -374,8 +448,12 @@
       '<h2 class="' + (win ? 'win' : 'lose') + '">' + (win ? '勝利！' : winner < 0 ? '平手' : '敗北…') + '</h2>' +
       '<p>' + stageLabel(stageIdx) + '　vs ' + st.general.name + '</p>' +
       '<p class="reward">' + (gold ? '💰 +' + gold + ' 金　' : '') + '⭐ +' + exp + ' 經驗 <small>（' + note + '）</small></p>' +
+      (drops.length ? '<p class="drop">🎁 獲得裝備：' + drops.map(function (id) {
+        var it = S.EQUIPMENT[id];
+        return '<b>' + it.name + '</b><small>（' + S.equipDesc(it) + '）</small>';
+      }).join('、') + '</p>' : '') +
       (unlock ? '<p class="unlock">' + unlock + '</p>' : '') +
-      (win ? '' : '<p class="hint">回營地招募士兵、提升能力後再挑戰吧</p>') +
+      (win ? '' : '<p class="hint">回營地招募士兵、提升能力、購買裝備後再挑戰吧</p>') +
       '<div class="cr-row"><button id="btn-camp" class="primary">回營地</button>' +
       '<button id="btn-again">再戰一次</button></div>';
     document.getElementById('btn-camp').addEventListener('click', function () {

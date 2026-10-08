@@ -25,7 +25,10 @@
 
   B.initEvents = function (opts) {
     this.control = (opts.control || [false, false]).slice();   // true = 玩家操控該方
-    this.command = [S.COMMAND.START, S.COMMAND.START];
+    var armies = this.armies;   // 裝備可增加開戰軍令 (army.commandBonus)
+    this.command = [0, 1].map(function (side) {
+      return Math.min(S.COMMAND.MAX, S.COMMAND.START + (armies[side].commandBonus || 0));
+    });
     this.tacticCd = [{}, {}];
     this.globalCd = [0, 0];
     this.chests = [];

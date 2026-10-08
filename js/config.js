@@ -7,31 +7,43 @@ window.Sango = window.Sango || {};
 (function (S) {
   'use strict';
 
-  // ---- 畫面 (NES 解析度 256x240，放大 SCALE 倍) ----
+  // ---- 畫面 (戰場 32x22 格，邏輯解析度 512x416，放大 SCALE 倍) ----
   S.TILE = 16;
-  S.COLS = 16;
-  S.ROWS = 11;
-  S.FIELD_W = S.COLS * S.TILE;          // 256
-  S.FIELD_H = S.ROWS * S.TILE;          // 176
+  S.COLS = 32;
+  S.ROWS = 22;
+  S.FIELD_W = S.COLS * S.TILE;          // 512
+  S.FIELD_H = S.ROWS * S.TILE;          // 352
   S.PANEL_H = 64;
   S.VIEW_W = S.FIELD_W;
-  S.VIEW_H = S.FIELD_H + S.PANEL_H;     // 240
+  S.VIEW_H = S.FIELD_H + S.PANEL_H;     // 416
   S.SCALE = 3;
   S.SIM_DT = 1 / 60;                    // 固定模擬步長 (秒)
 
   // ---- 地圖：'#' 城牆 (不可通行)，'.' 地面 ----
+  // 左右、上下對稱：中央兩座城寨、中路石柱分出三條路、兩翼岩石
   S.MAP = [
-    '................',
-    '......#..#......',
-    '......#..#......',
-    '......####......',
-    '................',
-    '................',
-    '................',
-    '......####......',
-    '......#..#......',
-    '......#..#......',
-    '................'
+    '................................',
+    '................................',
+    '............#......#............',
+    '............#......#............',
+    '.......##...#......#...##.......',
+    '.......##...#......#...##.......',
+    '............########............',
+    '................................',
+    '................................',
+    '..........#..........#..........',
+    '..........#..........#..........',
+    '..........#..........#..........',
+    '..........#..........#..........',
+    '................................',
+    '................................',
+    '............########............',
+    '.......##...#......#...##.......',
+    '.......##...#......#...##.......',
+    '............#......#............',
+    '............#......#............',
+    '................................',
+    '................................'
   ];
 
   // ---- 兵種 ----
@@ -147,8 +159,8 @@ window.Sango = window.Sango || {};
     FIRST: [5, 10],                // 第一個寶箱出現時間範圍
     INTERVAL: [9, 16],            // 之後每隔幾秒出現一個
     MAX: 2,                        // 場上最多幾個
-    AUTO_DIST: 3,                  // 附近幾步內沒在交戰的士兵會自行去撿
-    AI_DIST: 7                     // 電腦方會派最近幾步內的士兵去撿
+    AUTO_DIST: 5,                  // 附近幾步內沒在交戰的士兵會自行去撿
+    AI_DIST: 11                    // 電腦方會派最近幾步內的士兵去撿
   };
   // weight: 出現權重
   S.CHEST_ITEMS = {
@@ -197,10 +209,10 @@ window.Sango = window.Sango || {};
 
   // ---- 布陣 (左軍座標，右軍自動左右鏡像) ----
   S.FORMATION = {
-    general: [[0, 5]],
-    spear:   [[3, 4], [3, 6], [3, 5], [3, 3], [3, 7], [3, 2], [3, 8], [2, 5], [2, 3], [2, 7]],
-    archer:  [[1, 4], [1, 6], [1, 5], [2, 4], [2, 6], [1, 3], [1, 7], [2, 3], [2, 7], [1, 2]],
-    cavalry: [[2, 1], [2, 9], [3, 1], [3, 9], [1, 1], [1, 9], [2, 2], [2, 8], [0, 1], [0, 9]]
+    general: [[1, 10], [1, 11]],
+    spear:   [[6, 10], [6, 11], [6, 9], [6, 12], [6, 8], [6, 13], [6, 7], [6, 14], [5, 9], [5, 12]],
+    archer:  [[3, 10], [3, 11], [3, 9], [3, 12], [4, 8], [4, 13], [3, 8], [3, 13], [4, 7], [4, 14]],
+    cavalry: [[5, 4], [5, 17], [6, 5], [6, 16], [4, 4], [4, 17], [5, 6], [5, 15], [3, 5], [3, 16]]
   };
 
   S.UNIT_KINDS = ['spear', 'archer', 'cavalry'];
@@ -228,7 +240,57 @@ window.Sango = window.Sango || {};
   // 兵種等級：每級該兵種 HP / MP / 攻擊 / 防禦 / 智力 / 精神 +BONUS
   S.LEVEL = { BONUS: 0.05, MAX: 20 };
 
-  // 關卡：general 敵將能力，units 敵軍士兵，gold / exp 首次過關獎勵
+  // ---- 裝備：主將的武器 / 防具 / 寶物各一件 ----
+  // hp / war / int / lead：加到主將能力；command：開戰軍令；troops：全軍士兵能力 +%；speed：主將移動速度 +%
+  // price：商店售價 (0 = 只能從關卡取得)；value：賣出時的估價基準 (賣出得一半)
+  S.EQUIP_SLOTS = { weapon: '武器', armor: '防具', treasure: '寶物' };
+  S.EQUIP_SLOT_KEYS = ['weapon', 'armor', 'treasure'];
+  S.EQUIPMENT = {
+    ironSword:   { name: '鐵劍',       slot: 'weapon',   price: 300,  war: 5 },
+    steelSpear:  { name: '鋼槍',       slot: 'weapon',   price: 650,  war: 9 },
+    qinggang:    { name: '青釭劍',     slot: 'weapon',   price: 0, value: 1200, war: 12, int: 4 },
+    dragonBlade: { name: '青龍偃月刀', slot: 'weapon',   price: 0, value: 1600, war: 15, lead: 5 },
+    halberd:     { name: '方天畫戟',   slot: 'weapon',   price: 0, value: 2000, war: 20 },
+    leather:     { name: '皮甲',       slot: 'armor',    price: 250,  hp: 8 },
+    ironArmor:   { name: '鐵甲',       slot: 'armor',    price: 550,  hp: 12, lead: 4 },
+    brightArmor: { name: '明光鎧',     slot: 'armor',    price: 1000, hp: 18, lead: 8 },
+    artOfWar:    { name: '兵法書',     slot: 'treasure', price: 300,  int: 6 },
+    sunzi:       { name: '孫子兵法',   slot: 'treasure', price: 900,  int: 10, command: 2 },
+    warDrum:     { name: '戰鼓',       slot: 'treasure', price: 0, value: 1200, troops: 0.05 },
+    redHare:     { name: '赤兔馬',     slot: 'treasure', price: 0, value: 2000, war: 6, speed: 0.4 }
+  };
+  S.equipDesc = function (it) {
+    var parts = [];
+    S.STAT_KEYS.forEach(function (k) { if (it[k]) parts.push(S.STAT_NAMES[k] + ' +' + it[k]); });
+    if (it.command) parts.push('開戰軍令 +' + it.command);
+    if (it.troops) parts.push('全軍士兵能力 +' + Math.round(it.troops * 100) + '%');
+    if (it.speed) parts.push('主將移動速度 +' + Math.round(it.speed * 100) + '%');
+    return parts.join('、');
+  };
+  S.equipValue = function (it) { return it.price || it.value || 0; };
+
+  // 進度 → 上場的玩家軍隊 (主將能力 = 基本 + 裝備)；campaign.js 與 tools/campaign-sim.js 共用
+  S.playerArmy = function (profile) {
+    var g = profile.general;
+    var army = { name: g.name, hp: g.hp, war: g.war, int: g.int, lead: g.lead, beard: g.beard,
+                 units: profile.soldiers.slice(), commandBonus: 0, troopBonus: 0, speedBonus: 0 };
+    var equip = profile.equip || {};
+    S.EQUIP_SLOT_KEYS.forEach(function (slot) {
+      var it = S.EQUIPMENT[equip[slot]];
+      if (!it) return;
+      S.STAT_KEYS.forEach(function (k) { if (it[k]) army[k] += it[k]; });
+      army.commandBonus += it.command || 0;
+      army.troopBonus += it.troops || 0;
+      army.speedBonus += it.speed || 0;
+    });
+    return army;
+  };
+  S.playerLevels = function (profile) {
+    var l = profile.levels;
+    return { general: 0, spear: l.spear, archer: l.archer, cavalry: l.cavalry };
+  };
+
+  // 關卡：general 敵將能力，units 敵軍士兵，gold / exp 首次過關獎勵，drops 首次過關獲得的裝備
   // lv 敵軍等級：數字 = 全體同等級；也可以分別指定 { general, spear, archer, cavalry }
   S.stageLevels = function (st) {
     if (typeof st.lv === 'object') return Object.assign({ general: 0, spear: 0, archer: 0, cavalry: 0 }, st.lv);
@@ -240,21 +302,21 @@ window.Sango = window.Sango || {};
     { title: '廣宗之戰', general: { name: '張寶', hp: 55, war: 45, int: 72, lead: 45, beard: '#202020' },
       units: ['spear', 'spear', 'archer', 'archer', 'cavalry'], lv: 0, gold: 140, exp: 150 },
     { title: '汜水關', general: { name: '華雄', hp: 80, war: 86, int: 35, lead: 60, beard: '#282018' },
-      units: ['spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: 0, gold: 160, exp: 200 },
+      units: ['spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: 0, gold: 160, exp: 200, drops: ['ironArmor'] },
     { title: '壽春討伐', general: { name: '紀靈', hp: 75, war: 82, int: 42, lead: 70, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 1 }, gold: 180, exp: 250 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 1, spear: 1 }, gold: 180, exp: 250 },
     { title: '白馬之圍', general: { name: '顏良', hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 1 }, gold: 200, exp: 300 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2 }, gold: 200, exp: 300 },
     { title: '延津之戰', general: { name: '文醜', hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: 1, gold: 220, exp: 350 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 2 }, gold: 220, exp: 350, drops: ['warDrum'] },
     { title: '合肥之戰', general: { name: '張遼', hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 240, exp: 400 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 2, cavalry: 2 }, gold: 240, exp: 400 },
     { title: '博望坡', general: { name: '夏侯惇', hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: 2, gold: 260, exp: 450 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 4 }, gold: 260, exp: 450, drops: ['qinggang'] },
     { title: '樊城之戰', general: { name: '關羽', hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 2, cavalry: 3 }, gold: 300, exp: 500 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 4, cavalry: 4 }, gold: 300, exp: 500, drops: ['dragonBlade'] },
     { title: '虎牢關', general: { name: '呂布', hp: 98, war: 100, int: 26, lead: 85, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 4, cavalry: 5 }, gold: 500, exp: 600 }
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 6, spear: 6, archer: 5, cavalry: 6 }, gold: 500, exp: 600, drops: ['halberd', 'redHare'] }
   ];
 
   // ---- 雙方軍隊 (hp=體力 war=武力 int=智力 lead=統率；統率提升士兵防禦) ----

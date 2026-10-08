@@ -60,11 +60,12 @@
       this.int = roll(st.int);
       this.spr = roll(st.spr);
     }
-    // 玩家等級加成 (opts.levels[side] = { general: 2, spear: 1, ... })
+    // 等級加成 (opts.levels[side] = { general: 2, spear: 1, ... }) 與裝備的全軍士兵加成 (army.troopBonus)
     var lv = battle.levels && battle.levels[side];
     this.level = (lv && lv[type]) || 0;
-    if (this.level) {
-      var mul = 1 + this.level * S.LEVEL.BONUS;
+    var bonus = this.level * S.LEVEL.BONUS + (this.isGeneral ? 0 : army.troopBonus || 0);
+    if (bonus) {
+      var mul = 1 + bonus;
       var self = this;
       ['maxHp', 'maxMp', 'atk', 'def', 'int', 'spr'].forEach(function (k) { self[k] = Math.round(self[k] * mul); });
     }
@@ -76,7 +77,7 @@
     this.buffs = [];   // { kind: 'stat'|'burn'|'stun', t: 剩餘秒數, ... }
     this.range = st.range;
     this.ranged = !!st.ranged;
-    this.moveTime = st.moveTime;
+    this.moveTime = st.moveTime / (this.isGeneral ? 1 + (army.speedBonus || 0) : 1);   // 裝備：主將移動速度
     this.attackTime = st.attackTime;
     this.atkCd = battle.rng() * 0.6;
     this.thinkCd = battle.rng() * 0.4;

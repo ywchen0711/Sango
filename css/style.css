@@ -236,6 +236,12 @@ canvas.pointer { cursor: pointer; }
 .camp-head .plus { color: #80e0ff; margin-left: 2px; }
 @media (max-width: 600px) { .equip-slots { grid-template-columns: 1fr; } }
 
+/* ---- 出征 / 探索 ---- */
+.go-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; max-width: 330px; }
+.go-btns small { flex-basis: 100%; text-align: right; color: var(--muted); margin: 0; }
+button.explore { background: #2a4a6a; border-color: #4a7aa8; }
+button.explore:hover:not(:disabled) { background: #3a6a9a; }
+
 /* ---- 速度按鈕 ---- */
 .speed { display: inline-flex; align-items: center; }
 .speed button { padding: 5px 10px; border-radius: 0; margin-left: -1px; }

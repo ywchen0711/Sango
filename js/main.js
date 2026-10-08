@@ -21,6 +21,7 @@
   var renderer = new S.Renderer(canvas);
   var armies = S.DEFAULT_ARMIES.map(function (a) { return Object.assign({}, a, { units: a.units.slice() }); });
   var levels = null;
+  var explore = null;             // 探索模式的地圖 (S.makeExplore)；一般戰鬥為 null
   var battle, running = false, speed = 1, last = 0, acc = 0, tableT = 0;
   var active = false;             // 正式出征中 (營地預覽時為 false：不能下令、不能開始)
   var overFired = false;
@@ -34,7 +35,8 @@
   var hintT = 0, uiT = 0, logLen = -1;
 
   function newBattle() {
-    battle = S.currentBattle = new S.Battle(armies, { control: [true, false], autoTactics: [chkAutoTac.checked, false], levels: levels });   // S.currentBattle：方便在主控台除錯
+    battle = S.currentBattle = new S.Battle(armies, { control: [true, false], autoTactics: [chkAutoTac.checked, false],
+                                                      levels: levels, explore: explore });   // S.currentBattle：方便在主控台除錯
     running = false;
     overFired = false;
     acc = 0;
@@ -183,7 +185,8 @@
       army.units.forEach(function (t) { count[t.type || t]++; });
       var summary = S.UNIT_KINDS.map(function (k) { return SHORT[k] + '×' + count[k]; }).join(' ');
       var numbers = { spear: 0, archer: 0, cavalry: 0 };
-      var rows = battle.units.filter(function (u) { return u.side === side; }).map(function (u) {
+      // 探索模式的敵軍太多，只列敵將
+      var rows = battle.units.filter(function (u) { return u.side === side && (!explore || side === 0 || u.isGeneral); }).map(function (u) {
         var label = (u.isGeneral ? u.name : u.name + (++numbers[u.type])) +
           (u.level ? ' <small class="lv">Lv' + u.level + '</small>' : '');
         return '<tr data-id="' + u.id + '"><td class="name">' + label + '</td>' +
@@ -227,14 +230,17 @@
   }
 
   // 滑鼠位置 → 戰場格子與該處的單位 (點擊時也重算，手機點擊沒有 mousemove)
+  // 探索模式加上鏡頭位移換成地圖座標；指到下方面板不算
   function locate(e) {
-    var lx = e.offsetX / canvas.clientWidth * S.VIEW_W;
-    var ly = e.offsetY / canvas.clientHeight * S.VIEW_H;
+    var sx = e.offsetX / canvas.clientWidth * S.VIEW_W;
+    var sy = e.offsetY / canvas.clientHeight * S.VIEW_H;
+    mouseTile = hoverUnit = null;
+    if (sy >= S.FIELD_H) return;
+    var lx = sx + renderer.cam.x, ly = sy + renderer.cam.y;
     var tx = Math.floor(lx / S.TILE), ty = Math.floor(ly / S.TILE);
     mouseTile = battle.inBounds(tx, ty) ? { x: tx, y: ty } : null;
-    hoverUnit = null;
     battle.units.forEach(function (u) {
-      if (u.dead) return;
+      if (u.dead || !battle.isVisible(u.x, u.y)) return;
       var x = u.posX() * S.TILE, y = u.posY() * S.TILE;
       if (lx >= x && lx < x + S.TILE && ly >= y && ly < y + S.TILE) hoverUnit = u;
     });
@@ -247,6 +253,7 @@
     renderer.hoverChest = mouseTile && active && !aiming && !commanding ? battle.chestAt(mouseTile.x, mouseTile.y) : null;
     var myGeneral = hoverUnit && hoverUnit === battle.generals[humanSide] && canCommand();
     canvas.classList.toggle('pointer', !!renderer.hoverChest || !!myGeneral);
+    canvas.classList.toggle('commanding', commanding || (!!explore && canCommand() && !aiming));
     setHighlight(hoverUnit ? hoverUnit.id : -1);
   });
   canvas.addEventListener('mouseleave', function () {
@@ -267,6 +274,16 @@
       return;
     }
     var myGeneral = battle.generals[humanSide];
+    if (explore) {                // 探索模式：點地面移動、點敵人攻擊、點寶箱走過去打開
+      var ch = battle.chestAt(mouseTile.x, mouseTile.y);
+      if (ch && !(hoverUnit && hoverUnit.side !== humanSide)) {
+        hint(battle.commandGeneral(humanSide, { kind: 'move', x: ch.x, y: ch.y }) ? '前往寶箱' : '無法到達');
+        return;
+      }
+      if (hoverUnit && hoverUnit.side === humanSide) return;
+      commandAt(mouseTile, hoverUnit);
+      return;
+    }
     if (hoverUnit && hoverUnit === myGeneral) {
       setCommanding(!commanding);
       if (!commanding) hint('');
@@ -378,12 +395,17 @@
     onRetreat: null,              // 玩家按了撤退
     onSettings: null,             // 速度 / 兵力條改變
     // 布陣預覽：armies = [我軍, 敵軍]，lv = [我軍等級, 敵軍等級]
-    setup: function (newArmies, lv) {
+    // ex：探索模式的地圖 (S.makeExplore)，一般戰鬥省略
+    setup: function (newArmies, lv, ex) {
       armies = newArmies;
       levels = lv;
+      explore = ex || null;
       active = false;
       newBattle();
     },
+    // 探索模式途中撿到的裝備
+    getLoot: function () { return (battle && battle.lootFound) || []; },
+    isExplore: function () { return !!explore; },
     // 正式開戰
     start: function () {
       renderer.caption = null;

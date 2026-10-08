@@ -57,16 +57,37 @@
       }
     }
 
-    this.chestT -= dt;
-    if (this.chestT <= 0) { this.chestT = between(this.rng, S.CHEST.INTERVAL); this.spawnChest(); }
     this.chestAiT -= dt;
     if (this.chestAiT <= 0) { this.chestAiT = 0.5; this.assignChests(); }
 
     this.weatherT -= dt;
     if (this.weatherT <= 0) { this.weatherT = between(this.rng, S.WEATHER_CHANGE); this.changeWeather(); }
 
+    if (this.explore) { this.updateExplore(dt); return; }   // 探索：寶箱事先擺好、沒有伏兵
+
+    this.chestT -= dt;
+    if (this.chestT <= 0) { this.chestT = between(this.rng, S.CHEST.INTERVAL); this.spawnChest(); }
+
     if (!this.ambushDone && this.time >= S.AMBUSH.AFTER && this.rng() < S.AMBUSH.CHANCE * dt) this.ambush();
   };
+
+  // 探索模式：視野、非戰鬥回復
+  B.updateExplore = function (dt) {
+    var E = S.EXPLORE, self = this;
+    this.visionT = (this.visionT || 0) - dt;
+    if (this.visionT <= 0) { this.visionT = 0.2; this.updateVision(); }
+    this.regenT = (this.regenT || 0) - dt;
+    if (this.regenT > 0) return;
+    this.regenT = 0.5;
+    this.alive(0).forEach(function (u) {
+      var danger = self.unitsNear(1, u.x, u.y, E.REGEN_SAFE).some(function (e) { return e.awake; });
+      if (danger || u.hp >= u.maxHp) return;
+      u.hp = Math.min(u.maxHp, u.hp + u.maxHp * E.REGEN * 0.5);
+      u.mp = Math.min(u.maxMp, u.mp + u.maxMp * E.REGEN * 0.5);
+    });
+  };
+
+  B.rollChestItem = function () { return weighted(this.rng, S.CHEST_ITEMS); };
 
   B.notify = function (text, color) {
     this.notices.push({ text: text, color: color || '#ffffff', t: 0, dur: 2.5 });
@@ -187,9 +208,14 @@
 
   B.followOrder = function (u, enemies) {
     var o = u.order;
+    // 探索模式：主將跑太前面就先等部隊 (射程內有敵人照常攻擊)
+    if (this.explore && o.kind !== 'hold' && this.armyLagging(u)) {
+      if (!this.tryAttack(u, enemies)) u.thinkCd = 0.2;
+      return;
+    }
     if (o.kind === 'attack') {
       var t = o.target;
-      if (t.dead) { u.order = { kind: 'hold' }; u.thinkCd = 0.1; return; }
+      if (t.dead) { u.order = this.explore ? null : { kind: 'hold' }; u.thinkCd = 0.1; return; }
       u.target = t;
       if (this.inRangeAt(u, u.x, u.y, t)) {
         if (t.x !== u.x) u.facing = t.x > u.x ? 1 : -1;
@@ -203,9 +229,11 @@
       return;
     }
     if (o.kind === 'move') {
-      if (u.x === o.x && u.y === o.y) { u.order = { kind: 'hold' }; }
-      else if (!this.isFree(o.x, o.y, u) && Math.max(Math.abs(u.x - o.x), Math.abs(u.y - o.y)) <= 1) {
-        u.order = { kind: 'hold' };   // 目的地被佔住，就停在旁邊
+      var arrived = u.x === o.x && u.y === o.y ||
+        (!this.isFree(o.x, o.y, u) && Math.max(Math.abs(u.x - o.x), Math.abs(u.y - o.y)) <= 1);   // 目的地被佔住，就停在旁邊
+      if (arrived) {
+        u.order = this.explore ? null : { kind: 'hold' };
+        if (!u.order) { u.thinkCd = 0.05; return; }
       } else {
         if (!this.stepToward(u, o)) u.thinkCd = 0.2;
         return;
@@ -220,6 +248,13 @@
     if (!this.generalAlive(side) || this.globalCd[side] > 0) return;
     var self = this, rng = this.rng;
     var enemies = this.alive(1 - side), allies = this.alive(side);
+    if (this.explore) {
+      var g = this.generals[side];
+      if (side === 1 && !this.bossAwake) return;
+      enemies = this.unitsNear(1 - side, g.x, g.y, 12).filter(function (e) { return e.awake; });
+      allies = this.unitsNear(side, g.x, g.y, 12);
+      if (!allies.length) return;
+    }
     if (!enemies.length) return;
     var pts = this.command[side];
     function ready(id) { return !self.tacticBlocked(side, id) && rng() < 0.6; }
@@ -264,8 +299,8 @@
   B.spawnChest = function () {
     if (this.chests.length >= S.CHEST.MAX) return;
     var free = [];
-    for (var x = 4; x < S.COLS - 4; x++) {
-      for (var y = 0; y < S.ROWS; y++) {
+    for (var x = 4; x < this.cols - 4; x++) {
+      for (var y = 0; y < this.rows; y++) {
         if (this.isFree(x, y, null) && !this.chestAt(x, y)) free.push({ x: x, y: y });
       }
     }
@@ -280,9 +315,17 @@
     this.chests.splice(this.chests.indexOf(chest), 1);
     chest.open = false;
     this.units.forEach(function (o) { if (o.chestGoal === chest) { o.chestGoal = null; o.chestForced = false; } });
-    var it = S.CHEST_ITEMS[chest.item];
     var army = this.armies[u.side];
     var self = this;
+    if (chest.loot) {               // 探索模式的裝備箱
+      var item = S.rollLoot(this.explore.ilvl), info = S.itemInfo(item), color = S.QUALITIES[info.q].color;
+      if (u.side === 0) this.lootFound.push(item);
+      this.addText(u, info.name, color, 1.6, -0.6);
+      this.addBurst(u, color);
+      this.notify(u.name + ' 打開裝備箱：【' + S.QUALITIES[info.q].name + '】' + info.name, color);
+      return;
+    }
+    var it = S.CHEST_ITEMS[chest.item];
     this.chestOpens[it.name] = (this.chestOpens[it.name] || 0) + 1;
     this.addText(u, it.name, it.color, 1.4, -0.6);
     this.addBurst(u, it.color);
@@ -308,7 +351,7 @@
 
   // 可以去撿寶箱的部隊 (主將不會自行離開)，依實際路徑距離由近到遠
   B.chestSeekers = function (side, chest) {
-    var field = this.distanceField(chest.x, chest.y);
+    var field = this.distanceField(chest.x, chest.y, this.explore ? 24 : null);
     var self = this;
     return this.alive(side).filter(function (u) { return !u.isGeneral; })
       .map(function (u) { return { u: u, d: field[self.idx(u.x, u.y)] }; })
@@ -318,9 +361,10 @@
 
   // 自動派兵：附近沒在交戰的士兵會去撿；電腦方會派較遠的士兵
   B.assignChests = function () {
-    var self = this;
+    var self = this, g0 = this.generals[0];
     this.chests.forEach(function (chest) {
-      for (var side = 0; side < 2; side++) {
+      if (self.explore && (!g0 || g0.dead || cheb(chest.x, chest.y, g0.x, g0.y) > 10)) return;
+      for (var side = 0; side < (self.explore ? 1 : 2); side++) {
         var taken = self.units.some(function (u) { return !u.dead && u.side === side && u.chestGoal === chest; });
         if (taken) continue;
         var maxD = self.isHuman(side) ? S.CHEST.AUTO_DIST : S.CHEST.AI_DIST;
@@ -380,8 +424,8 @@
     var loser = power[0] < power[1] ? 0 : power[1] < power[0] ? 1 : (this.rng() * 2) | 0;
     var side = this.rng() < S.AMBUSH.LOSER_BIAS ? loser : 1 - loser;
     var free = [];
-    for (var x = 4; x < S.COLS - 4; x++) {
-      [0, S.ROWS - 1].forEach(function (y) {
+    for (var x = 4; x < this.cols - 4; x++) {
+      [0, this.rows - 1].forEach(function (y) {
         if (this.isFree(x, y, null) && !this.chestAt(x, y)) free.push({ x: x, y: y });
       }, this);
     }

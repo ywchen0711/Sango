@@ -322,7 +322,9 @@
           }).join('、') : '') +
           (first ? '' : '<small>（重打 ' + Math.round(C.REPLAY_RATE * 100) + '%）</small>') +
         '</div>' +
-        '<button id="btn-go" class="primary big">⚔ 出征</button>' +
+        '<div class="go-btns"><button id="btn-go" class="primary big" title="一場定勝負的會戰">⚔ 出征</button>' +
+          '<button id="btn-explore" class="primary big explore" title="在 20 倍大的地圖上四處探索、擊破敵營、開寶箱，最後打倒敵將">🗺 探索</button>' +
+          '<small>探索：獎勵 ×' + S.EXPLORE.REWARD_MULT + '，途中撿到的裝備都能帶走</small></div>' +
       '</div>' +
 
       '<div class="camp-cols">' +
@@ -427,7 +429,11 @@
       campMsg = '賣掉' + sname + '，獲得 ' + gain + ' 金';
       save();
     } else if (b.id === 'btn-go') {
+      exploring = false;
       startBattle();
+      return;
+    } else if (b.id === 'btn-explore') {
+      startExplore();
       return;
     } else if (b.id === 'btn-reset') {
       if (!window.confirm('確定要刪除「' + profile.general.name + '」和所有進度，重新建立武將嗎？')) return;
@@ -442,6 +448,16 @@
   });
 
   // ======================= 出征與結算 =======================
+  var exploring = false;          // 這場是探索模式
+
+  function startExplore() {
+    var st = S.STAGES[stageIdx];
+    exploring = true;
+    S.game.setup([playerArmy(), enemyArmy(st)], [playerLevels(), S.stageLevels(st)], S.makeExplore(stageIdx));
+    S.game.setCaption(null);
+    startBattle();
+  }
+
   function startBattle() {
     show('battle');
     S.game.start();
@@ -450,7 +466,14 @@
 
   S.game.onRetreat = function () {
     S.game.stop();
-    campMsg = '已撤退，這場戰鬥沒有獎勵';
+    if (exploring) {              // 探索模式撤退：撿到的裝備可以帶回來
+      var found = S.game.getLoot();
+      found.forEach(gainItem);
+      campMsg = '已撤退' + (found.length ? '，帶回 ' + found.length + ' 件裝備' : '，這次沒有撿到裝備');
+      save();
+    } else {
+      campMsg = '已撤退，這場戰鬥沒有獎勵';
+    }
     renderCamp();
   };
 
@@ -467,11 +490,12 @@
     var first = stageIdx >= profile.cleared;
     var win = winner === 0;
     var gold = 0, exp, note;
+    var mult = exploring ? S.EXPLORE.REWARD_MULT : 1;
     if (win) {
-      var rate = first ? 1 : C.REPLAY_RATE;
+      var rate = (first ? 1 : C.REPLAY_RATE) * mult;
       gold = Math.round(st.gold * rate);
       exp = Math.round(st.exp * rate);
-      note = first ? '首次過關' : '重打獎勵 ' + Math.round(C.REPLAY_RATE * 100) + '%';
+      note = (first ? '首次過關' : '重打獎勵 ' + Math.round(C.REPLAY_RATE * 100) + '%') + (exploring ? '・探索 ×' + mult : '');
       profile.stats.wins++;
       if (first) profile.cleared = stageIdx + 1;
     } else {
@@ -481,12 +505,9 @@
     }
     profile.gold += gold;
     profile.exp += exp;
-    // 戰利品：打贏掉落一件隨機裝備，首次過關另有關卡指定的裝備
-    var loot = [];
-    if (win) {
-      loot.push(S.rollLoot(stageIdx + 1));
-      if (first) (st.drops || []).forEach(function (dr) { loot.push(S.makeItem(Object.assign({ ilvl: stageIdx + 1 }, dr))); });
-    }
+    // 戰利品：一般出征打贏掉落一件隨機裝備；探索模式是途中撿到的裝備 (輸了也能帶走)；首次過關另有關卡指定的裝備
+    var loot = exploring ? S.game.getLoot().slice() : win ? [S.rollLoot(stageIdx + 1)] : [];
+    if (win && first) (st.drops || []).forEach(function (dr) { loot.push(S.makeItem(Object.assign({ ilvl: stageIdx + 1 }, dr))); });
     var lootNotes = loot.map(gainItem);
     restock();
     save();
@@ -515,6 +536,7 @@
       renderCamp();
     });
     document.getElementById('btn-again').addEventListener('click', function () {
+      if (exploring) { startExplore(); return; }
       preview();
       startBattle();
     });

@@ -206,12 +206,56 @@ window.Sango = window.Sango || {};
   S.UNIT_KINDS = ['spear', 'archer', 'cavalry'];
   S.UNITS_PER_ARMY = 9;
 
-  // ---- 經驗值與升級 (登入後才有；資料存在 Supabase) ----
-  // 戰鬥結束依結果獲得經驗值 (觀戰不給)；每花 COST 點經驗值可把主將或某一兵種升一級
-  // 每級讓玩家方該單位的 HP / MP / 攻擊 / 防禦 / 智力 / 精神 +BONUS
-  S.EXP = { win: 100, draw: 50, loss: 30 };
-  S.LEVEL = { COST: 100, BONUS: 0.05, MAX: 20 };
-  S.LEVEL_KEYS = ['general', 'spear', 'archer', 'cavalry'];
+  // ======================= 過關模式 =======================
+  // 建立角色：四項能力各從 BASE 起，另有 POINTS 點自由分配 (每項 MIN–MAX)；初始士兵 START_UNITS 隊
+  // 營地：金錢買士兵 (最多 MAX_UNITS 隊，賣出退 SELL_RATE)；經驗值提升主將能力或兵種等級
+  S.CAMPAIGN = {
+    CREATE: { BASE: 50, POINTS: 40, MIN: 30, MAX: 85 },
+    START_UNITS: 5,
+    START_GOLD: 0,
+    MAX_UNITS: 9,
+    PRICE: { spear: 100, archer: 120, cavalry: 150 },
+    SELL_RATE: 0.5,
+    STAT_COST: 100,                // 主將能力 +STAT_STEP 需要的經驗值
+    STAT_STEP: 3,
+    STAT_MAX: 100,
+    LEVEL_COST: 100,               // 兵種升一級需要的經驗值
+    REPLAY_RATE: 0.5,              // 重打已過關卡的獎勵倍率
+    LOSS_EXP_RATE: 0.3             // 戰敗仍可獲得的經驗值比例 (沒有金錢)
+  };
+  S.STAT_NAMES = { hp: '體力', war: '武力', int: '智力', lead: '統率' };
+  S.STAT_KEYS = ['hp', 'war', 'int', 'lead'];
+  // 兵種等級：每級該兵種 HP / MP / 攻擊 / 防禦 / 智力 / 精神 +BONUS
+  S.LEVEL = { BONUS: 0.05, MAX: 20 };
+
+  // 關卡：general 敵將能力，units 敵軍士兵，gold / exp 首次過關獎勵
+  // lv 敵軍等級：數字 = 全體同等級；也可以分別指定 { general, spear, archer, cavalry }
+  S.stageLevels = function (st) {
+    if (typeof st.lv === 'object') return Object.assign({ general: 0, spear: 0, archer: 0, cavalry: 0 }, st.lv);
+    return { general: st.lv, spear: st.lv, archer: st.lv, cavalry: st.lv };
+  };
+  S.STAGES = [
+    { title: '黃巾之亂', general: { name: '程遠志', hp: 45, war: 52, int: 20, lead: 30, beard: '#403020' },
+      units: ['spear', 'spear', 'archer'], lv: 0, gold: 120, exp: 100 },
+    { title: '廣宗之戰', general: { name: '張寶', hp: 55, war: 45, int: 72, lead: 45, beard: '#202020' },
+      units: ['spear', 'spear', 'archer', 'archer'], lv: 0, gold: 140, exp: 150 },
+    { title: '汜水關', general: { name: '華雄', hp: 80, war: 86, int: 35, lead: 60, beard: '#282018' },
+      units: ['spear', 'spear', 'archer', 'cavalry', 'cavalry'], lv: 0, gold: 160, exp: 200 },
+    { title: '壽春討伐', general: { name: '紀靈', hp: 75, war: 82, int: 42, lead: 70, beard: null },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry'], lv: 0, gold: 180, exp: 250 },
+    { title: '白馬之圍', general: { name: '顏良', hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
+      units: ['spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 1, spear: 1 }, gold: 200, exp: 300 },
+    { title: '延津之戰', general: { name: '文醜', hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 1, cavalry: 1 }, gold: 220, exp: 350 },
+    { title: '合肥之戰', general: { name: '張遼', hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 1, spear: 1, archer: 1 }, gold: 240, exp: 400 },
+    { title: '博望坡', general: { name: '夏侯惇', hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 2, archer: 1, cavalry: 2 }, gold: 260, exp: 450 },
+    { title: '樊城之戰', general: { name: '關羽', hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: 2, gold: 300, exp: 500 },
+    { title: '虎牢關', general: { name: '呂布', hp: 98, war: 100, int: 26, lead: 85, beard: null },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 3, cavalry: 4 }, gold: 500, exp: 600 }
+  ];
 
   // ---- 雙方軍隊 (hp=體力 war=武力 int=智力 lead=統率；統率提升士兵防禦) ----
   // 為了公平：預設兩軍兵種編成相同，武將能力取捨不同但總體戰力相當 (以 tools/simulate.js 驗證約 50:50)

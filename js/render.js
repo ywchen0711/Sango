@@ -18,7 +18,7 @@
     this.portraits = [];
     this.showBars = true;
     this.highlightId = -1;
-    this.drafting = false;          // 選將模式挑選中
+    this.caption = null;            // { title, sub }：營地預覽時蓋在戰場上的標題
     this.aim = null;                // 計策瞄準預覽 { x, y, radius, color, targets }
     this.hoverChest = null;
   }
@@ -447,13 +447,13 @@
   };
 
   Renderer.prototype.drawOverlay = function (battle, running) {
-    if (this.drafting) {
-      this.banner('選將中', '請在下方挑選武將與士兵');
+    if (this.caption) {
+      this.banner(this.caption.title, this.caption.sub);
     } else if (battle.state === 'over') {
-      var title = battle.winner < 0 ? '平手' : battle.armies[battle.winner].name + '軍 勝利！';
-      this.banner(title, (battle.timedOut ? '時間到 · ' : '') + '按 R 或「重新開始」再戰一場');
+      var title = battle.winner < 0 ? '平手' : battle.winner === 0 ? '勝利！' : '敗北…';
+      this.banner(title, (battle.timedOut ? '時間到 · ' : '') + '戰果請看下方');
     } else if (!running && battle.time === 0) {
-      this.banner('三國志 · 戰鬥', '按 空白鍵 或「開始」');
+      this.banner('三國志 · 戰鬥', '按 空白鍵 開始');
     } else if (!running) {
       this.banner('暫停');
     } else if (battle.time < 1.2) {

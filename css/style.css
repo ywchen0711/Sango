@@ -168,6 +168,19 @@ button small { color: var(--muted); margin-left: 4px; font-size: 12px; }
 .tac-hint { color: #f8d838; font-size: 13px; min-height: 1em; flex-basis: 100%; text-align: center; }
 canvas.aiming { cursor: crosshair; }
 canvas.commanding { cursor: cell; }
+canvas.attack { cursor: crosshair; }
+
+/* ---- 觸控裝置的方向鍵 (有實體鍵盤的電腦不顯示) ---- */
+.dpad { display: none; }
+@media (pointer: coarse) {
+  .dpad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 48px); gap: 4px;
+          user-select: none; -webkit-user-select: none; touch-action: none; }
+  .dpad button { font-size: 20px; padding: 0; touch-action: none; }
+  .dpad .up { grid-column: 2; grid-row: 1; }
+  .dpad .left { grid-column: 1; grid-row: 2; }
+  .dpad .right { grid-column: 3; grid-row: 2; }
+  .dpad .down { grid-column: 2; grid-row: 3; }
+}
 canvas.pointer { cursor: pointer; }
 .events { list-style: none; margin: 0; padding: 0; width: 100%; font-size: 13px; color: var(--muted);
           display: flex; flex-direction: column; gap: 2px; }

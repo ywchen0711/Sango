@@ -27,15 +27,22 @@
       <div id="tactics" class="tactics">
         <span id="tac-info" class="tac-info"></span>
         <button id="btn-general" class="tac general"></button>
-        <button id="btn-command" class="tac general" title="點戰場上的地面讓主將移動、點敵人讓主將攻擊">操控主將<kbd>W</kbd></button>
+        <button id="btn-command" class="tac general" title="點戰場上的地面讓主將走過去">點地移動<kbd>E</kbd></button>
         <span id="tac-buttons"></span>
         <span id="tac-hint" class="tac-hint"></span>
       </div>
-      <p class="help">🗺 探索模式：點地面移動、點敵人攻擊、點寶箱打開；靠近敵營會驚醒敵人，擊破敵營掉落裝備並有一隊陣亡士兵歸隊；
+      <div class="dpad" aria-label="移動主將">
+        <button data-walk="0,-1" class="up">▲</button>
+        <button data-walk="-1,0" class="left">◀</button>
+        <button data-walk="1,0" class="right">▶</button>
+        <button data-walk="0,1" class="down">▼</button>
+      </div>
+      <p class="help"><b>W A S D</b>（或方向鍵）移動主將，<b>滑鼠左鍵點敵人</b>讓主將攻擊該目標；放開方向鍵後主將原地固守<br>
+        🗺 探索模式：走到寶箱上就會打開；靠近敵營會驚醒敵人，擊破敵營掉落裝備並有一隊陣亡士兵歸隊；
         非戰鬥時部隊會慢慢回復；打倒敵將過關，主將陣亡則失敗（撿到的裝備都能帶走）；右下角是小地圖<br>
         槍兵 剋 騎兵 · 騎兵 剋 弓兵 · 弓兵 剋 槍兵（物理）｜ 魔法：智力 vs 精神，無視相剋<br>
         空白鍵：暫停 / 繼續　+ / −：調整速度　滑鼠指向單位或表格列可對照<br>
-        操控主將：點自己的主將或按 W，再點地面移動、點敵人攻擊（右鍵或 Esc 取消）；Q：主將出陣 / 退回後方待命（沒下令時主將會自行判斷出陣）<br>
+        點地移動：點自己的主將或按 E，再點地面讓主將走過去（右鍵或 Esc 取消）；Q：主將交給電腦出陣 / 退回後方待命<br>
         計策：消耗軍令（隨時間累積、擊破敵隊 +1），數字鍵 1–4 施放，火計 / 落雷需點選戰場位置（右鍵或 Esc 取消）<br>
         隨機事件：寶箱（點擊可派最近的士兵去撿，可能是陷阱！）、天候變化（大風助火、大雨滅火、濃霧縮短射程）、伏兵；暫停中也可以下令</p>
       <ol id="events" class="events"></ol>

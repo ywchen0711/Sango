@@ -190,6 +190,37 @@
     return true;
   };
 
+  // ---- WASD 直接操控主將：按住方向鍵一格一格走，放開後原地固守 ----
+  B.setWalk = function (side, dx, dy) {
+    var g = this.generals[side];
+    if (!g || g.dead || this.state !== 'fighting') return;
+    if (dx || dy) {
+      g.order = { kind: 'walk', dx: dx, dy: dy };
+      g.engaged = true;
+      g.held = false;
+      g.target = null;
+      if (!g.isMoving()) g.thinkCd = 0;
+    } else if (g.order && g.order.kind === 'walk') {
+      g.order = { kind: 'hold' };
+    }
+  };
+
+  // 朝 (dx, dy) 走一步；斜向被擋住時沿著牆滑動
+  B.walkStep = function (u, dx, dy) {
+    var tries = [[dx, dy]];
+    if (dx && dy) tries.push([dx, 0], [0, dy]);
+    for (var i = 0; i < tries.length; i++) {
+      var tx = u.x + tries[i][0], ty = u.y + tries[i][1];
+      if (this.canStep(u.x, u.y, tries[i][0], tries[i][1], u, false) ||
+          (this.canSwap(u, tx, ty) && this.canStep(u.x, u.y, tries[i][0], tries[i][1], u, true))) {
+        this.moveTo(u, tx, ty);
+        return;
+      }
+    }
+    if (dx) u.facing = dx;
+    u.thinkCd = 0.05;
+  };
+
   // ---- 手動操控主將 ----
   // order：{ kind: 'move', x, y } 走到指定格 (途中不停下交戰)
   //        { kind: 'attack', target } 追擊指定敵人
@@ -208,6 +239,7 @@
 
   B.followOrder = function (u, enemies) {
     var o = u.order;
+    if (o.kind === 'walk') { this.walkStep(u, o.dx, o.dy); return; }
     // 探索模式：主將跑太前面就先等部隊 (射程內有敵人照常攻擊)
     if (this.explore && o.kind !== 'hold' && this.armyLagging(u)) {
       if (!this.tryAttack(u, enemies)) u.thinkCd = 0.2;
@@ -215,7 +247,7 @@
     }
     if (o.kind === 'attack') {
       var t = o.target;
-      if (t.dead) { u.order = this.explore ? null : { kind: 'hold' }; u.thinkCd = 0.1; return; }
+      if (t.dead) { u.order = { kind: 'hold' }; u.thinkCd = 0.1; return; }
       u.target = t;
       if (this.inRangeAt(u, u.x, u.y, t)) {
         if (t.x !== u.x) u.facing = t.x > u.x ? 1 : -1;
@@ -232,8 +264,7 @@
       var arrived = u.x === o.x && u.y === o.y ||
         (!this.isFree(o.x, o.y, u) && Math.max(Math.abs(u.x - o.x), Math.abs(u.y - o.y)) <= 1);   // 目的地被佔住，就停在旁邊
       if (arrived) {
-        u.order = this.explore ? null : { kind: 'hold' };
-        if (!u.order) { u.thinkCd = 0.05; return; }
+        u.order = { kind: 'hold' };
       } else {
         if (!this.stepToward(u, o)) u.thinkCd = 0.2;
         return;

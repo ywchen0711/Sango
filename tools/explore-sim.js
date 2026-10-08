@@ -49,8 +49,9 @@ function bot(b) {
     }
     return;
   }
-  if (g.order) return;
-  if (b.unitsNear(1, g.x, g.y, S.EXPLORE.ENGAGE).length) return;
+  if (g.order && g.order.kind !== 'hold') return;
+  const near = b.unitsNear(1, g.x, g.y, S.EXPLORE.ENGAGE);
+  if (near.length) { b.commandGeneral(0, { kind: 'attack', target: near[0] }); return; }
   // 等士兵跟上、回復兵力
   if (soldiers.some(u => Math.max(Math.abs(u.x - g.x), Math.abs(u.y - g.y)) > 6)) return;
   if (g.hp < g.maxHp * 0.8) return;

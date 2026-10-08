@@ -162,6 +162,7 @@
     var mine = this.armies[0];
     var g = this.addUnit(0, 'general', cells[0].x, cells[0].y, mine);
     g.engaged = true;
+    g.order = { kind: 'hold' };   // 主將由玩家操控 (WASD 移動、點敵人攻擊)，不會自己衝出去
     g.maxHp = g.hp = Math.round(g.maxHp * S.EXPLORE.HERO_HP);
     mine.units.forEach(function (t, i) {
       var c = cells[i + 1];
@@ -613,7 +614,7 @@
 
   // 探索模式的主將可以和身旁沒在移動的我方士兵交換位置 (不會被自己的部隊困住)
   Battle.prototype.canSwap = function (u, x, y) {
-    if (!this.explore || !u.isGeneral || !this.inBounds(x, y)) return false;
+    if (!u.isGeneral || !this.inBounds(x, y) || !(this.explore || (u.order && u.order.kind === 'walk'))) return false;
     var o = this.occ[this.idx(x, y)];
     return !!o && o !== u && o.side === u.side && !o.isMoving() && !o.dead;
   };

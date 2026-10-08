@@ -18,7 +18,7 @@
   var btnCommand = document.getElementById('btn-command');
   var eventsEl = document.getElementById('events');
 
-  var renderer = new S.Renderer(canvas);
+  var renderer = S.currentRenderer = new S.Renderer(canvas);   // S.currentRenderer：方便在主控台除錯
   var armies = S.DEFAULT_ARMIES.map(function (a) { return Object.assign({}, a, { units: a.units.slice() }); });
   var levels = null;
   var explore = null;             // 探索模式的地圖 (S.makeExplore)；一般戰鬥為 null
@@ -103,7 +103,7 @@
     if (on && aiming) cancelAim();
     commanding = renderer.commanding = !!on;
     canvas.classList.toggle('commanding', commanding);
-    if (on) hint('操控' + armies[humanSide].name + '：點地面移動、點敵人攻擊（右鍵 / Esc 結束）');
+    if (on) hint('操控' + armies[humanSide].name + '：點地面移動（右鍵 / Esc 結束）');
   }
 
   function commandAt(tile, unit) {
@@ -253,7 +253,8 @@
     renderer.hoverChest = mouseTile && active && !aiming && !commanding ? battle.chestAt(mouseTile.x, mouseTile.y) : null;
     var myGeneral = hoverUnit && hoverUnit === battle.generals[humanSide] && canCommand();
     canvas.classList.toggle('pointer', !!renderer.hoverChest || !!myGeneral);
-    canvas.classList.toggle('commanding', commanding || (!!explore && canCommand() && !aiming));
+    canvas.classList.toggle('commanding', commanding);
+    canvas.classList.toggle('attack', !!hoverUnit && hoverUnit.side !== humanSide && canCommand() && !aiming);
     setHighlight(hoverUnit ? hoverUnit.id : -1);
   });
   canvas.addEventListener('mouseleave', function () {
@@ -274,16 +275,11 @@
       return;
     }
     var myGeneral = battle.generals[humanSide];
-    if (explore) {                // 探索模式：點地面移動、點敵人攻擊、點寶箱走過去打開
-      var ch = battle.chestAt(mouseTile.x, mouseTile.y);
-      if (ch && !(hoverUnit && hoverUnit.side !== humanSide)) {
-        hint(battle.commandGeneral(humanSide, { kind: 'move', x: ch.x, y: ch.y }) ? '前往寶箱' : '無法到達');
-        return;
-      }
-      if (hoverUnit && hoverUnit.side === humanSide) return;
+    if (hoverUnit && hoverUnit.side !== humanSide) {   // 左鍵點敵人：主將攻擊這個目標
       commandAt(mouseTile, hoverUnit);
       return;
     }
+    if (explore) { hint('用 W A S D 移動主將，點敵人攻擊'); return; }
     if (hoverUnit && hoverUnit === myGeneral) {
       setCommanding(!commanding);
       if (!commanding) hint('');
@@ -370,6 +366,32 @@
     renderer.showBars = chkBars.checked;
     if (S.game.onSettings) S.game.onSettings();
   });
+  // ---- WASD / 方向鍵 直接操控主將 ----
+  var WALK_KEYS = { KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0],
+                    ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+  var held = {};                  // 目前按住的方向 (鍵盤或螢幕方向鍵)
+  function applyWalk() {
+    var dx = 0, dy = 0;
+    Object.keys(held).forEach(function (k) { if (held[k]) { dx += held[k][0]; dy += held[k][1]; } });
+    dx = Math.sign(dx); dy = Math.sign(dy);
+    if (battle && active) battle.setWalk(humanSide, dx, dy);
+  }
+  function releaseAll() { held = {}; applyWalk(); }
+  window.addEventListener('blur', releaseAll);
+  document.addEventListener('keyup', function (e) {
+    if (WALK_KEYS[e.code] && held[e.code]) { delete held[e.code]; applyWalk(); }
+  });
+  // 觸控裝置的螢幕方向鍵
+  Array.prototype.forEach.call(document.querySelectorAll('[data-walk]'), function (b) {
+    var d = b.dataset.walk.split(',').map(Number), id = 'pad' + b.dataset.walk;
+    function down(e) { e.preventDefault(); held[id] = d; applyWalk(); }
+    function up(e) { e.preventDefault(); delete held[id]; applyWalk(); }
+    b.addEventListener('pointerdown', down);
+    b.addEventListener('pointerup', up);
+    b.addEventListener('pointerleave', up);
+    b.addEventListener('pointercancel', up);
+  });
+
   document.addEventListener('keydown', function (e) {
     var t = e.target;
     if (t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' ||
@@ -378,9 +400,14 @@
     if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') { setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, si + 1)], true); return; }
     if (e.key === '-' || e.code === 'NumpadSubtract') { setSpeed(SPEEDS[Math.max(0, si - 1)], true); return; }
     if (!active) return;
+    if (WALK_KEYS[e.code]) {
+      e.preventDefault();         // 方向鍵不要捲動網頁
+      if (!held[e.code]) { held[e.code] = WALK_KEYS[e.code]; applyWalk(); }
+      return;
+    }
     if (e.code === 'Space') { e.preventDefault(); toggle(); }
     else if (e.code === 'KeyQ') toggleGeneral();
-    else if (e.code === 'KeyW') { setCommanding(!commanding); updateTactics(); }
+    else if (e.code === 'KeyE') { setCommanding(!commanding); updateTactics(); }
     else if (e.code === 'Escape') { cancelAim(); setCommanding(false); hint(''); updateTactics(); }
     else {
       S.TACTIC_IDS.forEach(function (id) {
@@ -416,6 +443,7 @@
     },
     // 離開戰鬥 (回營地)
     stop: function () {
+      held = {};
       active = false;
       running = false;
       cancelAim();

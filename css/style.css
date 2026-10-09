@@ -269,6 +269,36 @@ canvas.pointer { cursor: pointer; }
 .aff-suffix { color: #90e0a0; }
 .camp-head .procs { flex-basis: 100%; font-size: 13px; color: #e0a0ff; }
 
+/* ---- 營舍：士兵卡片與詳細資料 ---- */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
+.card { border: 1px solid #3a3a4a; border-left: 3px solid #3a3a4a; border-radius: 4px; padding: 6px 8px; cursor: pointer;
+        display: flex; flex-direction: column; gap: 2px; font-size: 13px; min-width: 0; }
+.card:hover { background: #24242e; }
+.card.active { border-left-color: #4a8a4a; }
+.card.picked { outline: 2px solid #f8d838; }
+.card .cmeta, .card .cstat, .card .cskill { color: var(--muted); font-size: 12px; }
+.card .sp { color: #f8d838; font-weight: normal; }
+.card button { align-self: flex-start; padding: 2px 10px; font-size: 12px; margin-top: 2px; }
+.card button.on { background: #2c5a2c; border-color: #4a8a4a; }
+.card.q-magic-border { border-color: #4a5c9a; } .card.q-rare-border { border-color: #8a7a30; } .card.q-unique-border { border-color: #8a6a3a; }
+.card.active.q-magic-border, .card.active.q-rare-border, .card.active.q-unique-border { border-left-color: #4a8a4a; }
+.sname { font-weight: bold; overflow-wrap: anywhere; }
+.sname.q-normal { color: #e8e8e8; } .sname.q-magic { color: #7c9cff; } .sname.q-rare { color: #f8e050; } .sname.q-unique { color: #d8a860; }
+.sdetail { border-top: 1px solid #3a3a4a; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.sdetail .shead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sdetail .shead .sname { font-size: 16px; }
+.sdetail .sstats { font-size: 13px; }
+.sdetail .iaff { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 12px; }
+.aff-unique { color: #d8a860; }
+.skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.skill { border: 1px solid #3a3a4a; border-radius: 4px; padding: 5px 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: 13px; }
+.skill.passive { background: #22283a; }
+.skill small { flex-basis: 100%; color: var(--muted); font-size: 12px; }
+.skill button { margin-left: auto; padding: 1px 10px; }
+.sequip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 600px) { .sequip { grid-template-columns: 1fr; } }
+.recruit .sname { min-width: 8em; }
+
 /* 背包工具列 */
 .bag-tools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; }
 .bag-tools span { display: inline-flex; flex-wrap: wrap; gap: 3px; align-items: center; }

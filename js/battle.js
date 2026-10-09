@@ -63,22 +63,31 @@
     // 等級加成 (opts.levels[side] = { general: 2, spear: 1, ... }) 與裝備的全軍士兵加成 (army.troopBonus)
     var lv = battle.levels && battle.levels[side];
     this.level = (lv && lv[type]) || 0;
-    var bonus = this.level * S.LEVEL.BONUS + (this.isGeneral ? 0 : army.troopBonus || 0);
+    var named = preset && preset.name != null;   // 士兵角色 (soldiers.js)：能力已含等級，名字、技能等級、特效都由 preset 帶入
+    var bonus = (named ? 0 : this.level * S.LEVEL.BONUS) + (this.isGeneral ? 0 : army.troopBonus || 0);   // 士兵角色的等級已算在 preset 裡
     if (bonus) {
       var mul = 1 + bonus;
       var self = this;
       ['maxHp', 'maxMp', 'atk', 'def', 'int', 'spr'].forEach(function (k) { self[k] = Math.round(self[k] * mul); });
     }
+    if (named) {
+      this.name = preset.name;
+      this.named = true;
+      this.level = preset.lv || 0;
+      this.quality = preset.quality;
+      this.skillLv = preset.skillLv || null;
+      this.procs = preset.procs || null;
+    }
     this.hp = this.maxHp;
     this.mp = this.maxMp;
-    var nSkills = this.isGeneral ? S.GENERAL_SKILLS : 1;
+    var nSkills = this.isGeneral ? S.GENERAL_SKILLS : 2;   // 一般士兵物理 / 魔法各兩個 (和士兵角色的四個技能對等)
     this.physSkills = preset ? preset.physSkills.slice() : S.pickDistinct(S.PHYSICAL_SKILLS, nSkills, rng);
     this.magicSkills = preset ? preset.magicSkills.slice() : S.pickDistinct(S.MAGIC_SKILLS, nSkills, rng);
     this.buffs = [];   // { kind: 'stat'|'burn'|'stun', t: 剩餘秒數, ... }
-    this.range = st.range;
-    this.ranged = !!st.ranged;
-    this.moveTime = st.moveTime / (this.isGeneral ? 1 + (army.speedBonus || 0) : 1);   // 裝備：主將移動速度
-    this.attackTime = st.attackTime;
+    this.range = named && preset.range ? preset.range : st.range;
+    this.ranged = named && preset.ranged != null ? preset.ranged : !!st.ranged;
+    this.moveTime = st.moveTime / (this.isGeneral ? 1 + (army.speedBonus || 0) : 1) * (named ? preset.moveMul || 1 : 1);   // 裝備：主將移動速度
+    this.attackTime = st.attackTime * (named ? preset.attackMul || 1 : 1);
     this.atkCd = battle.rng() * 0.6;
     this.thinkCd = battle.rng() * 0.4;
     this.retargetCd = 0;
@@ -720,10 +729,13 @@
     // 隨機決定物理或魔法，再判定是否發動特技
     var magic = this.rng() < u.int / (u.atk + u.int);
     var pool = magic ? u.magicSkills : u.physSkills;
-    var sk = S.SKILLS[pool[(this.rng() * pool.length) | 0]];
+    var skId = pool.length ? pool[(this.rng() * pool.length) | 0] : null;
+    var sk = skId ? S.SKILLS[skId] : null;
+    var skLv = (u.skillLv && skId && u.skillLv[skId]) || 1;   // 士兵的技能等級：威力 +6% / 級、發動率 +0.5% / 級
     var skill = null;
-    if (u.mp >= sk.mp && this.rng() < S.SKILL_CHANCE) {
+    if (sk && u.mp >= sk.mp && this.rng() < S.SKILL_CHANCE + 0.005 * (skLv - 1)) {
       if (sk.support) {
+        u.skillMul = 1 + 0.06 * (skLv - 1);
         if (this.castSupport(u, sk)) { u.mp -= sk.mp; this.countSkill(sk); u.charged = false; return; }
       } else {
         skill = sk;
@@ -734,9 +746,9 @@
       }
     }
 
-    var hit = { magic: magic, skill: skill, mul: 1 };
+    var hit = { magic: magic, skill: skill, mul: skill ? 1 + 0.06 * (skLv - 1) : 1 };
     var adjacent = cheb(u.x, u.y, e.x, e.y) <= 1;
-    if (!magic && u.ranged && adjacent) hit.mul *= S.UNIT_TYPES[u.type].meleePenalty;
+    if (!magic && u.ranged && adjacent) hit.mul *= S.UNIT_TYPES[u.type].meleePenalty || 0.5;
     if (!magic && u.charged) hit.mul *= S.UNIT_TYPES.cavalry.chargeBonus;
     u.charged = false;
 
@@ -769,7 +781,7 @@
       });
     }
     // 主將的中綴特效 (裝備)：破甲、致命一擊、吸血、燃燒 / 混亂 / 緩速
-    var procs = u.isGeneral && this.armies[u.side] && this.armies[u.side].procs;
+    var procs = u.procs || (u.isGeneral && this.armies[u.side] && this.armies[u.side].procs);   // 士兵也可以有特效
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
       for (var h = 0; h < (sk.hits || 1) && !t.dead; h++) {
@@ -811,7 +823,7 @@
         if (r < low && cheb(a.x, a.y, u.x, u.y) <= S.SUPPORT_RANGE) { low = r; best = a; }
       });
       if (!best) return false;
-      var amt = u.stat('int') * sk.heal * (0.85 + this.rng() * 0.3);
+      var amt = u.stat('int') * sk.heal * (u.skillMul || 1) * (0.85 + this.rng() * 0.3);
       amt = Math.max(1, Math.round(amt));
       best.hp = Math.min(best.maxHp, best.hp + amt);
       this.sound('heal', best);

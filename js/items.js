@@ -182,7 +182,7 @@
                 burn: 12, stun: 30, slow: 10, leech: 35, crit: 30, pierce: 15, cdr: 20, mf: 8, gf: 4 };
   S.ITEM_SELL_RATE = 0.35;
   S.MAX_ILVL = 30;                // 地獄第 10 關 = 物品等級 30
-  S.BAG_SIZE = 100;
+  S.BAG_SIZE = 300;
 
   function rnd(a, b) { return a + Math.floor(S.random() * (b - a + 1)); }
   function pick(list) { return list[Math.floor(S.random() * list.length)]; }
@@ -409,8 +409,11 @@
   // 進度 → 上場的玩家軍隊 (主將能力 = 基本 + 裝備 + 套裝加成)；campaign.js 與 tools/campaign-sim.js 共用
   S.playerArmy = function (profile) {
     var g = profile.general;
+    // 出戰的士兵 (soldiers.js) 轉成戰鬥用的 preset；舊格式 (兵種字串) 照舊
+    var units = profile.soldiers.filter(function (s) { return typeof s === 'string' || s.active; }).slice(0, S.CAMPAIGN.MAX_UNITS)
+      .map(function (s) { return typeof s === 'string' ? s : S.soldierStats(s); });
     var army = { name: g.name, hp: g.hp, war: g.war, int: g.int, lead: g.lead, beard: g.beard,
-                 units: profile.soldiers.slice(), commandBonus: 0, troopBonus: 0, speedBonus: 0, procs: {} };
+                 units: units, commandBonus: 0, troopBonus: 0, speedBonus: 0, procs: {} };
     S.PROC_KEYS.forEach(function (k) { army.procs[k] = 0; });
     function add(st) {
       ['hp', 'war', 'int', 'lead'].forEach(function (k) { if (st[k]) army[k] += st[k]; });
@@ -429,9 +432,10 @@
     S.PROC_KEYS.forEach(function (k) { army.procs[k] = Math.min(CAP[k], army.procs[k]); });
     return army;
   };
+  // 士兵的等級已經算在各自的能力裡；舊格式的兵種字串才用 levels
   S.playerLevels = function (profile) {
-    var l = profile.levels;
-    return { general: 0, spear: l.spear, archer: l.archer, cavalry: l.cavalry };
+    var l = profile.levels || {};
+    return { general: 0, spear: l.spear || 0, archer: l.archer || 0, cavalry: l.cavalry || 0 };
   };
 
   // ======================= 舊版存檔 (裝備是字串 id) =======================

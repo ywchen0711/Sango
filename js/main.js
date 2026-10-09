@@ -242,7 +242,7 @@
       var numbers = { spear: 0, archer: 0, cavalry: 0 };
       // 探索模式的敵軍太多，只列敵將
       var rows = battle.units.filter(function (u) { return u.side === side && (!explore || side === 0 || u.isGeneral); }).map(function (u) {
-        var label = (u.isGeneral ? u.name : u.name + (++numbers[u.type])) +
+        var label = (u.isGeneral || u.named ? u.name : u.name + (++numbers[u.type])) +
           (u.level ? ' <small class="lv">Lv' + u.level + '</small>' : '');
         return '<tr data-id="' + u.id + '"><td class="name">' + label + '</td>' +
           '<td class="hp"></td><td class="mp"></td>' +

@@ -38,9 +38,12 @@
   }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
   function unitName(t) { return S.UNIT_TYPES[t].name; }
-  function sortSoldiers() {
-    profile.soldiers.sort(function (a, b) { return S.UNIT_KINDS.indexOf(a) - S.UNIT_KINDS.indexOf(b); });
-  }
+  var BARRACKS = 30;              // 營舍上限 (出戰最多 S.CAMPAIGN.MAX_UNITS 隊)
+  var RECRUITS = 6;               // 徵兵處的候選人數
+  var pickedId = null;            // 營舍裡選中的士兵
+  function activeCount() { return profile.soldiers.filter(function (x) { return x.active; }).length; }
+  function findSoldier(id) { for (var i = 0; i < profile.soldiers.length; i++) if (profile.soldiers[i].id === id) return profile.soldiers[i]; return null; }
+  function className(sol) { return S.CLASSES[sol.cls].name; }
 
   function save() {
     return S.store.save(profile).catch(function () {});
@@ -61,8 +64,13 @@
     return S.store.load().then(function (p) {
       profile = p;
       if (!profile) { renderCreate(); return; }
-      // 舊資料補齊欄位
+      // 舊資料補齊欄位；士兵轉成角色 (舊版的兵種等級算進每個士兵，之後歸零)
       profile.levels = Object.assign({ spear: 0, archer: 0, cavalry: 0 }, profile.levels);
+      profile.soldiers = (profile.soldiers || []).map(function (x) { return S.normalizeSoldier(x, profile.levels); }).filter(Boolean);
+      profile.levels = { spear: 0, archer: 0, cavalry: 0 };
+      if (!activeCount()) profile.soldiers.slice(0, C.MAX_UNITS).forEach(function (x) { x.active = true; });
+      profile.soldiers.filter(function (x) { return x.active; }).slice(C.MAX_UNITS).forEach(function (x) { x.active = false; });
+      profile.recruits = (profile.recruits || []).map(function (x) { return S.normalizeSoldier(x); }).filter(Boolean);
       profile.stats = Object.assign({ wins: 0, losses: 0 }, profile.stats);
       profile.gold = Number(profile.gold) || 0;
       profile.exp = Number(profile.exp) || 0;
@@ -75,7 +83,7 @@
       profile.equip = moved.equip;
       profile.items = profile.items.concat(moved.extra);
       profile.shop = (profile.shop || []).map(S.normalizeItem).filter(Boolean);
-      if (!profile.shop.length) restock();
+      if (!profile.shop.length || !profile.recruits.length) restock();
       save();                     // 把轉換後的新格式存回去
       S.game.applySettings(profile.settings);
       stageIdx = Math.min(clr(), S.STAGES.length - 1);
@@ -118,8 +126,8 @@
       '<p>剩餘點數 <b id="cr-left"></b>　<small>（每項 ' + cr.MIN + '–' + cr.MAX + '）</small></p>' +
       '<h3>初始士兵（' + C.START_UNITS + ' 隊）</h3>' +
       '<div class="cr-units">' + units.map(function (t, i) {
-        return '<select data-unit="' + i + '">' + S.UNIT_KINDS.map(function (k) {
-          return '<option value="' + k + '"' + (k === t ? ' selected' : '') + '>' + unitName(k) + '</option>';
+        return '<select data-unit="' + i + '">' + S.CLASS_KEYS.map(function (k) {
+          return '<option value="' + k + '"' + (k === t ? ' selected' : '') + '>' + S.CLASSES[k].name + '</option>';
         }).join('') + '</select>';
       }).join('') + '</div>' +
       '<p class="hint">槍兵 剋 騎兵 · 騎兵 剋 弓兵 · 弓兵 剋 槍兵</p>' +
@@ -154,7 +162,7 @@
         if (stats[k] < cr.MAX) stats[k]++;
       }
       Array.prototype.forEach.call(createEl.querySelectorAll('[data-unit]'), function (sel) {
-        sel.value = S.UNIT_KINDS[(S.random() * 3) | 0];
+        sel.value = S.CLASS_KEYS[(S.random() * S.CLASS_KEYS.length) | 0];
       });
       refresh();
     });
@@ -163,7 +171,11 @@
       var msg = document.getElementById('cr-msg');
       if (!name) { msg.textContent = '請輸入武將名字'; return; }
       if (left() > 0) { msg.textContent = '還有 ' + left() + ' 點能力沒有分配'; return; }
-      var soldiers = Array.prototype.map.call(createEl.querySelectorAll('[data-unit]'), function (sel) { return sel.value; });
+      var soldiers = Array.prototype.map.call(createEl.querySelectorAll('[data-unit]'), function (sel) {
+        var sol = S.makeSoldier({ cls: sel.value, q: 'normal', ilvl: 1 });
+        sol.active = true;
+        return sol;
+      });
       profile = {
         general: { name: name, hp: stats.hp, war: stats.war, int: stats.int, lead: stats.lead,
                    beard: document.getElementById('cr-beard').value || null },
@@ -179,7 +191,6 @@
         stats: { wins: 0, losses: 0 },
         settings: S.game.getSettings()
       };
-      sortSoldiers();
       restock();
       stageIdx = 0;
       campMsg = name + ' 出陣！先從第 1 關開始吧';
@@ -224,7 +235,10 @@
   var SHOP_SIZE = 9;                // 每個部位各一件
   var bagFilter = 'all', bagSort = 'new';   // 背包的篩選 / 排序
   function shopLevel() { return Math.min(S.MAX_ILVL, clr() + 1 + D().ilvl); }
-  function restock() { profile.shop = S.rollShop(shopLevel(), SHOP_SIZE); }
+  function restock() {
+    profile.shop = S.rollShop(shopLevel(), SHOP_SIZE);
+    profile.recruits = S.rollRecruits(shopLevel(), RECRUITS);
+  }
 
   function itemName(item) {
     var info = S.itemInfo(item);
@@ -332,6 +346,82 @@
       '<button data-sellall="magic"' + (nMagic ? '' : ' disabled') + '>賣出全部魔法<small>' + nMagic + '</small></button></span></div>';
   }
 
+  // ======================= 營舍 / 徵兵處 =======================
+  function soldierLabel(sol) {
+    return '<span class="sname q-' + sol.q + '">' + esc(S.soldierFullName(sol)) + '</span>';
+  }
+  function soldierSkillsText(sol) {
+    return sol.skills.map(function (k) { return S.skillName(k.id) + (k.lv > 1 ? k.lv : ''); }).join('・');
+  }
+  function soldierAffixText(sol) {
+    return S.soldierAffixLines(sol).map(function (a) {
+      return '<span class="aff-' + a.group + '">' + (a.group === 'unique' ? '' : '【' + S.AFFIX_GROUPS[a.group] + '】' + a.name + '：') + a.line + '</span>';
+    }).join('');
+  }
+  function renderBarracks() {
+    var picked = pickedId && findSoldier(pickedId);
+    return '<div class="box wide"><h3>營舍 <small>出戰 ' + activeCount() + ' / ' + C.MAX_UNITS + '・共 ' + profile.soldiers.length + ' / ' + BARRACKS + ' 人</small></h3>' +
+      '<div class="cards">' + profile.soldiers.map(function (sol) {
+        var st = S.soldierStats(sol);
+        return '<div class="card' + (sol.active ? ' active' : '') + (picked === sol ? ' picked' : '') + ' q-' + sol.q + '-border" data-pick="' + sol.id + '">' +
+          soldierLabel(sol) +
+          '<span class="cmeta">' + className(sol) + '　Lv' + sol.lv + (sol.sp ? '　<b class="sp">技能點 ' + sol.sp + '</b>' : '') + '</span>' +
+          '<span class="cstat">兵 ' + st.hp + '　攻 ' + st.atk + '　防 ' + st.def + '　智 ' + st.int + '</span>' +
+          '<span class="cskill">' + soldierSkillsText(sol) + '</span>' +
+          '<button data-active="' + sol.id + '" class="' + (sol.active ? 'on' : '') + '"' +
+            (!sol.active && activeCount() >= C.MAX_UNITS ? ' disabled title="出戰已滿 9 隊"' : '') + '>' + (sol.active ? '出戰中' : '休息中') + '</button>' +
+          '</div>';
+      }).join('') + '</div>' +
+      (picked ? renderSoldierDetail(picked) : '<p class="hint">點選士兵查看技能、升級與裝備</p>') +
+      '</div>';
+  }
+  function renderSoldierDetail(sol) {
+    var st = S.soldierStats(sol), cost = S.soldierLevelCost(sol.lv), maxLv = sol.lv >= S.LEVEL.MAX;
+    var fits = profile.items.map(function (it, i) { return i; }).filter(function (i) {
+      return S.SOLDIER_EQUIP[S.itemInfo(profile.items[i]).slot];
+    }).sort(function (a, b) { return S.itemValue(profile.items[b]) - S.itemValue(profile.items[a]); }).slice(0, 8);
+    return '<div class="sdetail">' +
+      '<div class="shead">' + soldierLabel(sol) + '<span class="muted">' + S.SOLDIER_QUALITIES[sol.q].name + '・' + className(sol) +
+        '　Lv' + sol.lv + '</span>' +
+        '<button data-solv="' + sol.id + '"' + (maxLv || profile.exp < cost ? ' disabled' : '') + '>' +
+          (maxLv ? '已達上限' : 'Lv▲<small>' + cost + ' 經驗</small>') + '</button>' +
+        '<button data-dismiss="' + sol.id + '" class="danger"' + (profile.soldiers.length <= 1 ? ' disabled' : '') + '>解僱</button></div>' +
+      '<div class="sstats">兵力 ' + st.hp + '　MP ' + st.mp + '　攻擊 ' + st.atk + '　防禦 ' + st.def + '　智力 ' + st.int + '　精神 ' + st.spr +
+        (st.ranged ? '　射程 ' + st.range : '') +
+        (Object.keys(st.procs).some(function (k) { return st.procs[k]; }) ? '　<span class="aff-infix">' + S.statLines(st.procs).join('、') + '</span>' : '') + '</div>' +
+      (S.soldierAffixLines(sol).length ? '<div class="iaff">' + soldierAffixText(sol) + '</div>' : '') +
+      '<h4>技能 <small>每升一級得到 1 點技能點（目前 ' + sol.sp + ' 點），技能最高 ' + S.SKILL_MAX + ' 級</small></h4>' +
+      '<div class="skills">' + sol.skills.map(function (k, i) {
+        var passive = !!S.PASSIVES[k.id];
+        return '<div class="skill' + (passive ? ' passive' : '') + '"><b>' + S.skillName(k.id) + '</b> Lv' + k.lv +
+          '<small>' + (passive ? '被動・' : '') + S.skillDesc(k.id, k.lv) + '</small>' +
+          '<button data-skill="' + i + '"' + (!sol.sp || k.lv >= S.SKILL_MAX ? ' disabled' : '') + '>▲</button></div>';
+      }).join('') + '</div>' +
+      '<h4>裝備 <small>武力→攻擊、體力→兵力、智力→智力、統率→防禦 / 精神；開戰軍令等主將專用屬性對士兵無效</small></h4>' +
+      '<div class="sequip">' + S.SOLDIER_EQUIP_KEYS.map(function (slot) {
+        var it = sol.equip[slot];
+        return '<div class="slot">' + '<span class="slot-name">' + S.SOLDIER_EQUIP[slot] + '</span>' +
+          (it ? itemLine(it, '<button data-sunequip="' + slot + '">卸下</button>') : '<span class="muted">（空）</span>') + '</div>';
+      }).join('') + '</div>' +
+      (fits.length ? '<h4>倉庫裡可以裝備的 <small>依價值排序，前 8 件</small></h4>' + fits.map(function (i) {
+        return itemLine(profile.items[i], '<button data-sequip="' + i + '">裝備</button>');
+      }).join('') : '') +
+      '</div>';
+  }
+  function renderRecruits() {
+    var full = profile.soldiers.length >= BARRACKS;
+    return '<div class="box wide"><h3>徵兵處 <small>每場戰鬥後換一批' + (full ? '・營舍已滿' : '') + '</small></h3>' +
+      (profile.recruits.length ? profile.recruits.map(function (sol, i) {
+        var price = S.soldierPrice(sol), st = S.soldierStats(sol);
+        return '<div class="item recruit">' + soldierLabel(sol) +
+          '<span class="itag">' + S.SOLDIER_QUALITIES[sol.q].name + '・' + className(sol) + '・Lv' + sol.lv + '</span>' +
+          '<span class="idesc">兵 ' + st.hp + '　攻 ' + st.atk + '　防 ' + st.def + '　智 ' + st.int + '　技能：' + soldierSkillsText(sol) + '</span>' +
+          '<span class="ibtns"><button data-hire="' + i + '"' + (full || profile.gold < price ? ' disabled' : '') + '>招募<small>' + price + ' 金</small></button></span>' +
+          (S.soldierAffixLines(sol).length ? '<span class="iaff">' + soldierAffixText(sol) + '</span>' : '') + '</div>';
+      }).join('') : '<p class="hint">目前沒有人應徵</p>') +
+      '</div>';
+  }
+
   function preview() {
     var st = S.STAGES[stageIdx];
     S.game.setup([playerArmy(), enemyArmy(st)], [playerLevels(), S.stageLevels(st, diffKey())], null, battleOpts(stageIdx));
@@ -343,9 +433,6 @@
     var g = profile.general, st = S.STAGES[stageIdx];
     var first = stageIdx >= clr();
     var rate = (first ? 1 : C.REPLAY_RATE) * D().reward;
-    var count = { spear: 0, archer: 0, cavalry: 0 };
-    profile.soldiers.forEach(function (t) { count[t]++; });
-    var full = profile.soldiers.length >= C.MAX_UNITS;
     var army = playerArmy();          // 含裝備加成
 
     campEl.innerHTML =
@@ -399,19 +486,9 @@
       '</div>' +
 
       '<div class="camp-cols">' +
-        '<div class="box"><h3>軍隊 <small>' + profile.soldiers.length + ' / ' + C.MAX_UNITS + ' 隊</small></h3>' +
-          '<div class="soldiers">' + profile.soldiers.map(function (t, i) {
-            return '<span class="soldier ' + t + '">' + unitName(t) +
-              '<button data-sell="' + i + '" title="賣出，退回 ' + Math.floor(C.PRICE[t] * C.SELL_RATE) + ' 金"' +
-              (profile.soldiers.length <= 1 ? ' disabled' : '') + '>×</button></span>';
-          }).join('') + '</div>' +
-          '<div class="buy">' + S.UNIT_KINDS.map(function (t) {
-            return '<button data-buy="' + t + '"' + (full || profile.gold < C.PRICE[t] ? ' disabled' : '') + '>' +
-              '招募' + unitName(t) + '<small>' + C.PRICE[t] + ' 金</small></button>';
-          }).join('') + '</div>' +
-          (full ? '<p class="hint">軍隊已滿，可以先賣掉士兵再招募其他兵種</p>' : '') +
-        '</div>' +
-        '<div class="box"><h3>能力提升 <small>用經驗值</small></h3>' +
+        renderBarracks() +
+        renderRecruits() +
+        '<div class="box"><h3>主將能力 <small>用經驗值</small></h3>' +
           '<table class="ups"><tbody>' +
           S.STAT_KEYS.map(function (k) {
             var max = g[k] >= C.STAT_MAX, cost = S.statCost(g[k]);
@@ -420,14 +497,8 @@
               ' title="' + STAT_DESC[k] + '">' + (max ? '已達上限' : '+' + C.STAT_STEP + '<small>' + cost + ' 經驗</small>') +
               '</button></td></tr>';
           }).join('') +
-          S.UNIT_KINDS.map(function (t) {
-            var lv = profile.levels[t], max = lv >= S.LEVEL.MAX, cost = S.levelCost(lv);
-            return '<tr><th>' + unitName(t) + '</th><td>Lv' + lv + '</td><td>' +
-              '<button data-lv="' + t + '"' + (max || profile.exp < cost ? ' disabled' : '') +
-              ' title="全部' + unitName(t) + '能力 +' + Math.round(S.LEVEL.BONUS * 100) + '%">' +
-              (max ? '已達上限' : 'Lv▲<small>' + cost + ' 經驗</small>') + '</button></td></tr>';
-          }).join('') +
           '</tbody></table>' +
+          '<p class="hint">士兵的等級與技能在「營舍」裡各自提升</p>' +
         '</div>' +
         renderEquipBox() +
       '</div>' +
@@ -438,7 +509,7 @@
 
   campEl.addEventListener('click', function (e) {
     if (view !== 'camp' || !profile) return;
-    var b = e.target.closest('button');
+    var b = e.target.closest('button') || e.target.closest('[data-pick]');
     if (!b || b.disabled) return;
     var d = b.dataset, C2 = C;
     if (d.diff) {
@@ -451,37 +522,82 @@
     } else if (d.stage != null) {
       stageIdx = Number(d.stage);
       campMsg = '';
-    } else if (d.buy) {
-      if (profile.soldiers.length >= C2.MAX_UNITS || profile.gold < C2.PRICE[d.buy]) return;
-      profile.gold -= C2.PRICE[d.buy];
-      profile.soldiers.push(d.buy);
-      sortSoldiers();
-      campMsg = '招募了' + unitName(d.buy);
-      sfx('coin');
+    } else if (d.hire != null) {
+      var rec = profile.recruits[Number(d.hire)], price = rec && S.soldierPrice(rec);
+      if (!rec || profile.gold < price || profile.soldiers.length >= BARRACKS) return;
+      profile.gold -= price;
+      profile.recruits.splice(Number(d.hire), 1);
+      rec.active = activeCount() < C2.MAX_UNITS;
+      profile.soldiers.push(rec);
+      pickedId = rec.id;
+      campMsg = '招募了' + className(rec) + ' ' + S.soldierFullName(rec) + (rec.active ? '（出戰）' : '（營舍待命）');
+      sfx(rec.q === 'unique' ? 'loot_unique' : 'coin');
       save();
-    } else if (d.sell != null) {
-      var t = profile.soldiers[Number(d.sell)];
-      var refund = Math.floor(C2.PRICE[t] * C2.SELL_RATE);
-      if (profile.soldiers.length <= 1 || !window.confirm('賣掉一隊' + unitName(t) + '，退回 ' + refund + ' 金？')) return;
-      profile.soldiers.splice(Number(d.sell), 1);
+    } else if (d.active) {
+      var sa = findSoldier(d.active);
+      if (!sa) return;
+      if (!sa.active && activeCount() >= C2.MAX_UNITS) return;
+      if (sa.active && activeCount() <= 1) { campMsg = '至少要有一隊士兵出戰'; renderCamp(); return; }
+      sa.active = !sa.active;
+      campMsg = S.soldierFullName(sa) + (sa.active ? ' 出戰' : ' 回營舍休息');
+      save();
+    } else if (d.solv) {
+      var sl = findSoldier(d.solv), lc = sl && S.soldierLevelCost(sl.lv);
+      if (!sl || profile.exp < lc || sl.lv >= S.LEVEL.MAX) return;
+      profile.exp -= lc;
+      sl.lv++;
+      sl.sp++;
+      campMsg = S.soldierFullName(sl) + ' 升到 Lv' + sl.lv + '，得到 1 點技能點';
+      sfx('levelup');
+      save();
+    } else if (d.skill != null) {
+      var sk = findSoldier(pickedId), skill = sk && sk.skills[Number(d.skill)];
+      if (!skill || !sk.sp || skill.lv >= S.SKILL_MAX) return;
+      sk.sp--;
+      skill.lv++;
+      campMsg = S.soldierFullName(sk) + ' 的「' + S.skillName(skill.id) + '」提升到 ' + skill.lv + ' 級';
+      sfx('levelup');
+      save();
+    } else if (d.sequip != null) {
+      var se = findSoldier(pickedId), sit = profile.items[Number(d.sequip)];
+      var sslot = sit && S.itemInfo(sit).slot;
+      if (!se || !S.SOLDIER_EQUIP[sslot]) return;
+      profile.items.splice(Number(d.sequip), 1);
+      if (se.equip[sslot]) profile.items.push(se.equip[sslot]);
+      se.equip[sslot] = sit;
+      campMsg = S.soldierFullName(se) + ' 裝備了' + S.itemInfo(sit).name;
+      sfx('equip');
+      save();
+    } else if (d.sunequip) {
+      var su = findSoldier(pickedId);
+      if (!su || !su.equip[d.sunequip]) return;
+      if (profile.items.length >= S.BAG_SIZE) { campMsg = '倉庫已滿，無法卸下'; renderCamp(); return; }
+      profile.items.push(su.equip[d.sunequip]);
+      su.equip[d.sunequip] = null;
+      campMsg = S.soldierFullName(su) + ' 卸下了裝備';
+      sfx('equip');
+      save();
+    } else if (d.dismiss) {
+      var sd = findSoldier(d.dismiss);
+      if (!sd || profile.soldiers.length <= 1) return;
+      var refund = Math.floor(S.soldierPrice(sd) * 0.3);
+      if (!window.confirm('解僱 ' + S.soldierFullName(sd) + '？退回 ' + refund + ' 金，身上的裝備會放回倉庫')) return;
+      S.SOLDIER_EQUIP_KEYS.forEach(function (k) { if (sd.equip[k]) profile.items.push(sd.equip[k]); });
+      profile.soldiers.splice(profile.soldiers.indexOf(sd), 1);
+      if (!activeCount()) profile.soldiers[0].active = true;
       profile.gold += refund;
-      campMsg = '賣掉一隊' + unitName(t) + '，獲得 ' + refund + ' 金';
+      pickedId = null;
+      campMsg = '解僱了 ' + S.soldierFullName(sd) + '，退回 ' + refund + ' 金';
       sfx('coin');
       save();
+    } else if (d.pick) {
+      pickedId = pickedId === d.pick ? null : d.pick;
     } else if (d.up) {
       var sc = S.statCost(profile.general[d.up]);
       if (profile.exp < sc || profile.general[d.up] >= C2.STAT_MAX) return;
       profile.exp -= sc;
       profile.general[d.up] = Math.min(C2.STAT_MAX, profile.general[d.up] + C2.STAT_STEP);
       campMsg = S.STAT_NAMES[d.up] + ' 提升到 ' + profile.general[d.up];
-      sfx('levelup');
-      save();
-    } else if (d.lv) {
-      var lc = S.levelCost(profile.levels[d.lv]);
-      if (profile.exp < lc || profile.levels[d.lv] >= S.LEVEL.MAX) return;
-      profile.exp -= lc;
-      profile.levels[d.lv]++;
-      campMsg = unitName(d.lv) + ' 升到 Lv' + profile.levels[d.lv];
       sfx('levelup');
       save();
     } else if (d.bagfilter) {
@@ -638,7 +754,7 @@
         return itemLine(item, '', lootNotes[i] ? ' <small>' + lootNotes[i] + '</small>' : '');
       }).join('') + '</div>' : '') +
       (unlock ? '<p class="unlock">' + unlock + '</p>' : '') +
-      (win ? '' : '<p class="hint">回營地招募士兵、提升能力、購買裝備後再挑戰吧</p>') +
+      (win ? '' : '<p class="hint">回營地招募士兵、升級士兵與技能、換裝備後再挑戰吧</p>') +
       '<div class="cr-row"><button id="btn-camp" class="primary">回營地</button>' +
       '<button id="btn-again">再戰一次</button></div>';
     document.getElementById('btn-camp').addEventListener('click', function () {

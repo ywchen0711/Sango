@@ -8,7 +8,7 @@ const path = require('path');
 const vm = require('vm');
 
 global.window = {};
-for (const f of ['config.js', 'items.js', 'explore.js', 'sprites.js', 'battle.js', 'tactics.js', 'elites.js', 'skills.js']) {
+for (const f of ['config.js', 'items.js', 'soldiers.js', 'explore.js', 'sprites.js', 'battle.js', 'tactics.js', 'elites.js', 'skills.js']) {
   vm.runInThisContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), { filename: f });
 }
 const S = window.Sango;
@@ -25,7 +25,7 @@ function newPlayer() {
   const each = C.CREATE.BASE + C.CREATE.POINTS / 4;   // 平均分配點數、初始士兵 槍2 弓2 騎1
   return {
     general: { name: '玩家', hp: each, war: each, int: each, lead: each, beard: null },
-    soldiers: ['spear', 'spear', 'archer', 'archer', 'cavalry'],
+    soldiers: ['spear', 'spear', 'archer', 'archer', 'cavalry'].map(c => Object.assign(S.makeSoldier({ cls: c, q: 'normal', ilvl: 1 }), { active: true })),
     levels: { spear: 0, archer: 0, cavalry: 0 },
     equip: S.migrateEquip({}).equip,
     gold: C.START_GOLD, exp: 0, buyIdx: 0, upIdx: 0, shop: S.rollShop(1, 9)
@@ -42,7 +42,7 @@ function spend(p) {
   while (p.soldiers.length < C.MAX_UNITS && p.gold >= C.PRICE[BUY_ORDER[p.buyIdx % BUY_ORDER.length]]) {
     const t = BUY_ORDER[p.buyIdx++ % BUY_ORDER.length];
     p.gold -= C.PRICE[t];
-    p.soldiers.push(t);
+    p.soldiers.push(Object.assign(S.makeSoldier({ cls: S.BASE_CLASS[t], q: 'normal', ilvl: 1 }), { active: true }));
   }
   if (p.soldiers.length >= C.MAX_UNITS) {
     // 買能提升最多的裝備
@@ -60,15 +60,17 @@ function spend(p) {
     }
   }
   for (let guard = 0; guard < 500; guard++) {
+    // 兵種等級改成：該兵種的每個士兵各升一級 (費用 = 各士兵的費用總和)
     const k = UP_ORDER[p.upIdx % UP_ORDER.length];
     const isLv = p.levels[k] != null;
-    const maxed = isLv ? p.levels[k] >= S.LEVEL.MAX : p.general[k] >= C.STAT_MAX;
-    const cost = isLv ? S.levelCost(p.levels[k]) : S.statCost(p.general[k]);
+    const group = isLv ? p.soldiers.filter(s => S.CLASSES[s.cls].type === k && s.lv < S.LEVEL.MAX) : [];
+    const maxed = isLv ? !group.length : p.general[k] >= C.STAT_MAX;
+    const cost = isLv ? group.reduce((sum, s) => sum + S.soldierLevelCost(s.lv), 0) : S.statCost(p.general[k]);
     if (!maxed && p.exp < cost) break;
     p.upIdx++;
     if (maxed) continue;
     p.exp -= cost;
-    if (isLv) p.levels[k]++;
+    if (isLv) group.forEach(s => { s.lv++; const sk = s.skills[s.lv % 4]; if (sk.lv < S.SKILL_MAX) sk.lv++; else s.sp++; });
     else p.general[k] = Math.min(C.STAT_MAX, p.general[k] + C.STAT_STEP);
   }
 }
@@ -105,7 +107,7 @@ DIFFS.forEach(diff => S.STAGES.forEach((st, k) => {
   const p = players[0], a = S.playerArmy(p), lv = p.levels;
   const eq = S.EQUIP_SLOT_KEYS.filter(s => p.equip[s]).length + '/10 件';
   console.log(`${D.name} 第${k + 1}關 ${st.general.name} 勝率 ${(w / games * 100).toFixed(0)}% 平均${(time / games).toFixed(0)}s` +
-    ` | 玩家1 兵${p.soldiers.length} Lv 槍${lv.spear} 弓${lv.archer} 騎${lv.cavalry}` +
+    ` | 玩家1 兵${p.soldiers.length} 平均Lv ${(p.soldiers.reduce((s, x) => s + x.lv, 0) / p.soldiers.length).toFixed(1)}` +
     ` 體${a.hp} 武${a.war} 智${a.int} 統${a.lead} 士兵+${Math.round(a.troopBonus * 100)}% ${eq} 剩金${p.gold}`);
   players.forEach((p, pi) => reward(p, st, k, diff, loots[pi]));
 }));

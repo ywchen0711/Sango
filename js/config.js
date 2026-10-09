@@ -270,9 +270,9 @@ window.Sango = window.Sango || {};
   // lv：敵軍全體等級加成 (再加上 perStage × 關卡序號)  ilvl：掉落物品等級加成  reward：金錢 / 經驗倍率
   // elite：一般出征時每隊敵兵成為精英的機率  campElite：探索模式每座敵營有精英的機率
   S.DIFFICULTIES = {
-    normal:    { name: '普通', lv: 0,  perStage: 0,   ilvl: 0,  reward: 1,   elite: 0.05, campElite: 0.5,  color: '#e8e8f0' },
-    nightmare: { name: '噩夢', lv: 5,  perStage: 0.4, ilvl: 10, reward: 2.5, elite: 0.15, campElite: 0.75, color: '#ff9040' },
-    hell:      { name: '地獄', lv: 10, perStage: 0.8, ilvl: 20, reward: 5,   elite: 0.25, campElite: 1,    color: '#ff4040' }
+    normal:    { name: '普通', lv: 0,  perStage: 0.12,ilvl: 0,  reward: 1,   elite: 0.05, campElite: 0.5,  color: '#e8e8f0' },
+    nightmare: { name: '噩夢', lv: 5,  perStage: 0.65,ilvl: 10, reward: 2.5, elite: 0.15, campElite: 0.75, color: '#ff9040' },
+    hell:      { name: '地獄', lv: 10, perStage: 1.0, ilvl: 20, reward: 5,   elite: 0.25, campElite: 1,    color: '#ff4040' }
   };
   S.DIFFICULTY_KEYS = ['normal', 'nightmare', 'hell'];
   S.STAGES = [

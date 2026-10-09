@@ -7,7 +7,7 @@ const path = require('path');
 const vm = require('vm');
 
 global.window = {};
-for (const f of ['config.js', 'items.js', 'explore.js', 'sprites.js', 'battle.js', 'tactics.js', 'elites.js', 'skills.js']) {
+for (const f of ['config.js', 'items.js', 'soldiers.js', 'explore.js', 'sprites.js', 'battle.js', 'tactics.js', 'elites.js', 'skills.js']) {
   vm.runInThisContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), { filename: f });
 }
 const S = window.Sango;
@@ -33,6 +33,8 @@ function playerAt(k) {
     exp -= 100;
   }
   if (k > 0) S.EQUIP_SLOT_KEYS.forEach(key => { p.equip[key] = S.makeItem({ ilvl: k, quality: 'magic', slot: key.replace(/[12]$/, '') }); });
+  p.soldiers = p.soldiers.map(t => Object.assign(S.makeSoldier({ cls: S.BASE_CLASS[t], q: 'normal', ilvl: 1, lv: p.levels[t] }), { active: true }));
+  p.levels = { spear: 0, archer: 0, cavalry: 0 };
   return p;
 }
 

@@ -443,6 +443,10 @@
       g.beginPath(); g.arc(x + 8, y + 8, 11, 0, Math.PI * 2); g.fill();
     }
     if (u.invulnT > 0 && Math.floor(Date.now() / 40) % 2) g.globalAlpha = 0.5;   // 突進中無敵
+    if (u.quality && u.quality !== 'normal' && !u.dead) {   // 我軍士兵的品質：腳下的色條
+      g.fillStyle = S.QUALITIES[u.quality].color;
+      g.fillRect(x + 3, y + 14, 10, 1);
+    }
     if (u.elite && !u.dead) {     // 精英：腳下閃動的紫色光環
       g.fillStyle = 'rgba(200,110,255,' + (0.35 + 0.2 * Math.sin(time * 5)) + ')';
       g.beginPath(); g.ellipse(x + 8, y + 14, 9, 3.5, 0, 0, Math.PI * 2); g.fill();

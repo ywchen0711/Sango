@@ -33,8 +33,8 @@
   var active = false;             // 正式出征中 (營地預覽時為 false：不能下令、不能開始)
   var overFired = false;
   var rowById = {}, rosterSize = 0;
-  var SIDE_NAMES = ['我軍', '敵軍'];
-  var SHORT = { spear: '槍', archer: '弓', cavalry: '騎' };
+  var SIDE_NAMES = [S.t('我軍'), S.t('敵軍')];
+  var SHORT = { spear: S.t('槍'), archer: S.t('弓'), cavalry: S.t('騎') };
   var humanSide = 0;              // 玩家固定操控藍軍
   var aiming = null;              // 正在瞄準的計策 id
   var commanding = false;         // 操控主將中：點地面移動、點敵人攻擊
@@ -60,7 +60,7 @@
 
   function updateUI() {
     btnStart.hidden = btnRetreat.hidden = !active;   // 速度與兵力條一直顯示，暫停 / 撤退只在戰鬥中
-    btnStart.textContent = running ? '⏸ 暫停' : '▶ 繼續';
+    btnStart.textContent = running ? S.t('⏸ 暫停') : S.t('▶ 繼續');
     btnStart.disabled = battle.state === 'over';
     btnRetreat.disabled = battle.state === 'over';
   }
@@ -94,20 +94,20 @@
       dx = best ? best.x - g.x : g.facing; dy = best ? best.y - g.y : 0;
     }
     var why = battle.generalDash(humanSide, dx, dy);
-    if (why) hint(S.GENERAL_SKILLS_DEF.dash.name + '：' + why);
+    if (why) hint(S.GENERAL_SKILLS_DEF.dash.name + S.t('：') + why);
     updateTactics();
   }
   function doWhirl() {
     if (!canCommand()) return;
     var why = battle.generalWhirl(humanSide);
-    if (why) hint(S.GENERAL_SKILLS_DEF.whirl.name + '：' + why);
+    if (why) hint(S.GENERAL_SKILLS_DEF.whirl.name + S.t('：') + why);
     updateTactics();
   }
   function setStanceKey(k, user) {
     stanceKey = k;
     if (battle) battle.setStance(humanSide, k);
     Array.prototype.forEach.call(stanceBtns, function (b) { b.classList.toggle('on', b.dataset.stance === k); });
-    if (user) { hint('陣型：' + S.STANCES[k].name + '（' + S.STANCES[k].desc + '）'); if (S.game.onSettings) S.game.onSettings(); }
+    if (user) { hint(S.t('陣型：') + S.STANCES[k].name + S.t('（') + S.STANCES[k].desc + S.t('）')); if (S.game.onSettings) S.game.onSettings(); }
   }
   btnDash.addEventListener('click', doDash);
   btnWhirl.addEventListener('click', doWhirl);
@@ -128,12 +128,12 @@
     if (!canCommand()) return;
     if (aiming === id) { cancelAim(); updateTactics(); return; }
     var why = battle.tacticBlocked(humanSide, id);
-    if (why) { hint(S.TACTICS[id].name + '：' + why); return; }
+    if (why) { hint(S.TACTICS[id].name + S.t('：') + why); return; }
     if (S.TACTICS[id].target) {
       setCommanding(false);
       aiming = id;
       canvas.classList.add('aiming');
-      hint('點選戰場上的目標位置施放「' + S.TACTICS[id].name + '」（右鍵 / Esc 取消）');
+      hint(S.t('點選戰場上的目標位置施放「') + S.TACTICS[id].name + S.t('」（右鍵 / Esc 取消）'));
       updateAim();
     } else {
       battle.useTactic(humanSide, id);
@@ -153,17 +153,17 @@
     if (on && aiming) cancelAim();
     commanding = renderer.commanding = !!on;
     canvas.classList.toggle('commanding', commanding);
-    if (on) hint('操控' + armies[humanSide].name + '：點地面移動（右鍵 / Esc 結束）');
+    if (on) hint(S.t('操控') + armies[humanSide].name + S.t('：點地面移動（右鍵 / Esc 結束）'));
   }
 
   function commandAt(tile, unit) {
     var ok;
     if (unit && unit.side !== humanSide) {
       ok = battle.commandGeneral(humanSide, { kind: 'attack', target: unit });
-      hint(ok ? '攻擊' + unit.name + '！' : '無法攻擊');
+      hint(ok ? S.t('攻擊') + unit.name + S.t('！') : S.t('無法攻擊'));
     } else {
       ok = battle.commandGeneral(humanSide, { kind: 'move', x: tile.x, y: tile.y });
-      hint(ok ? '移動到指定位置' : '無法移動到那裡');
+      hint(ok ? S.t('移動到指定位置') : S.t('無法移動到那裡'));
     }
   }
 
@@ -190,10 +190,10 @@
     var g = battle.generals[side];
     var alive = battle.generalAlive(side);
     tacInfo.className = 'tac-info side' + side;
-    tacInfo.textContent = armies[side].name + '　軍令 ' +
+    tacInfo.textContent = armies[side].name + S.t('　軍令 ') +
       (alive ? Math.floor(battle.command[side]) : 0) + '/' + S.COMMAND.MAX;
-    btnGeneral.innerHTML = (g && g.engaged ? '主將待命' : '主將出陣') + '<kbd>Q</kbd>';
-    btnGeneral.title = g && g.engaged ? '主將退回後方待機，只反擊射程內的敵人' : '主將親自上陣衝殺';
+    btnGeneral.innerHTML = (g && g.engaged ? S.t('主將待命') : S.t('主將出陣')) + '<kbd>Q</kbd>';
+    btnGeneral.title = g && g.engaged ? S.t('主將退回後方待機，只反擊射程內的敵人') : S.t('主將親自上陣衝殺');
     btnGeneral.disabled = !alive || !canCommand();
     if (commanding && (!alive || !canCommand())) setCommanding(false);
     btnCommand.disabled = !alive || !canCommand();
@@ -208,7 +208,7 @@
       var cd = battle.tacticCd[side][id] || 0;
       var why = canCommand() ? battle.tacticBlocked(side, id) : '—';
       var btn = tacButtons[id];
-      btn.innerHTML = tc.name + (cd > 0 ? '<small>' + Math.ceil(cd) + 's</small>' : '<small>' + tc.cost + '令</small>') +
+      btn.innerHTML = tc.name + (cd > 0 ? '<small>' + Math.ceil(cd) + 's</small>' : '<small>' + tc.cost + S.t('令</small>')) +
         '<kbd>' + tc.key + '</kbd>';
       btn.disabled = !!why && aiming !== id;
       btn.classList.toggle('aiming', aiming === id);
@@ -228,7 +228,7 @@
     if (!ids.length) return '<td class="skill">—</td>';   // 士兵角色可能沒有物理或魔法技能 (四個技能都是另一類或被動)
     return '<td class="skill ' + S.SKILLS[ids[0]].kind + '">' + ids.map(function (id) {
       var sk = S.SKILLS[id];
-      return '<span title="' + sk.desc + '（MP ' + sk.mp + '）">' + sk.name + '</span>';
+      return '<span title="' + sk.desc + S.t('（MP ') + sk.mp + S.t('）">') + sk.name + '</span>';
     }).join(' ') + '</td>';
   }
 
@@ -250,10 +250,10 @@
           '<td>' + u.atk + '</td><td>' + u.def + '</td><td>' + u.int + '</td><td>' + u.spr + '</td>' +
           skillCell(u.physSkills) + skillCell(u.magicSkills) + '</tr>';
       }).join('');
-      return '<section class="army side' + side + '"><h2>' + SIDE_NAMES[side] + '・' + esc(army.name) +
+      return '<section class="army side' + side + '"><h2>' + SIDE_NAMES[side] + S.t('・') + esc(army.name) +
         ' <small>' + summary + '</small></h2>' +
-        '<table><thead><tr><th>單位</th><th>HP</th><th>MP</th><th>攻擊</th><th>防禦</th><th>智力</th><th>精神</th>' +
-        '<th>物理特技</th><th>魔法特技</th></tr></thead><tbody>' + rows + '</tbody></table></section>';
+        S.t('<table><thead><tr><th>單位</th><th>HP</th><th>MP</th><th>攻擊</th><th>防禦</th><th>智力</th><th>精神</th>') +
+        S.t('<th>物理特技</th><th>魔法特技</th></tr></thead><tbody>') + rows + '</tbody></table></section>';
     }).join('');
 
     Array.prototype.forEach.call(roster.querySelectorAll('tr[data-id]'), function (tr) {
@@ -327,7 +327,7 @@
     if (!canCommand() || !mouseTile) return;
     if (aiming) {
       if (battle.useTactic(humanSide, aiming, mouseTile.x, mouseTile.y)) { cancelAim(); hint(''); }
-      else hint('範圍內沒有敵軍');
+      else hint(S.t('範圍內沒有敵軍'));
       updateTactics();
       return;
     }
@@ -339,10 +339,10 @@
     var portal = explore && battle.portalAt(mouseTile.x, mouseTile.y);
     if (portal && battle.seen[battle.idx(portal.x, portal.y)]) {   // 點洞穴入口 / 出口：主將走過去並進入
       var okP = battle.commandGeneral(humanSide, { kind: 'move', x: portal.x, y: portal.y });
-      hint(okP ? (portal.exit ? '走向出口' : '前往 ' + portal.name) : '無法前往');
+      hint(okP ? (portal.exit ? S.t('走向出口') : S.t('前往 ') + portal.name) : S.t('無法前往'));
       return;
     }
-    if (explore) { hint('用 W A S D 移動主將，點敵人攻擊；走進洞穴入口可以切換場景'); return; }
+    if (explore) { hint(S.t('用 W A S D 移動主將，點敵人攻擊；走進洞穴入口可以切換場景')); return; }
     if (hoverUnit && hoverUnit === myGeneral) {
       setCommanding(!commanding);
       if (!commanding) hint('');
@@ -353,7 +353,7 @@
     var chest = battle.chestAt(mouseTile.x, mouseTile.y);
     if (chest) {
       var u = battle.fetchChest(humanSide, chest);
-      hint(u ? '派' + u.name + '去撿寶箱' : '沒有部隊能到達寶箱');
+      hint(u ? S.t('派') + u.name + S.t('去撿寶箱') : S.t('沒有部隊能到達寶箱'));
     }
   });
   canvas.addEventListener('contextmenu', function (e) {
@@ -362,7 +362,7 @@
     else if (canCommand()) {      // 右鍵敵人：全軍集火
       e.preventDefault();
       locate(e);
-      if (hoverUnit && hoverUnit.side !== humanSide && battle.setFocus(humanSide, hoverUnit)) hint('全軍集火：' + hoverUnit.name);
+      if (hoverUnit && hoverUnit.side !== humanSide && battle.setFocus(humanSide, hoverUnit)) hint(S.t('全軍集火：') + hoverUnit.name);
     }
   });
 
@@ -433,7 +433,7 @@
     var wasRunning = running;
     running = false;
     updateUI();
-    if (window.confirm('確定要撤退嗎？這場戰鬥不會獲得任何獎勵。')) { if (S.game.onRetreat) S.game.onRetreat(); }
+    if (window.confirm(S.t('確定要撤退嗎？這場戰鬥不會獲得任何獎勵。'))) { if (S.game.onRetreat) S.game.onRetreat(); }
     else { running = wasRunning; updateUI(); }
   });
   // 速度按鈕 (+ / − 快捷鍵切換)
@@ -452,7 +452,7 @@
   setSpeed(1);
   chkAutoTac.addEventListener('change', function () {
     battle.autoTactics[0] = chkAutoTac.checked;
-    hint(chkAutoTac.checked ? '計策交給電腦判斷施放（你仍可手動施放）' : '計策改由你手動施放');
+    hint(chkAutoTac.checked ? S.t('計策交給電腦判斷施放（你仍可手動施放）') : S.t('計策改由你手動施放'));
     if (S.game.onSettings) S.game.onSettings();
   });
   chkBars.addEventListener('change', function () {

@@ -110,12 +110,12 @@
   // 回傳無法施放的原因；可以施放時回傳空字串
   B.tacticBlocked = function (side, id) {
     var tc = S.TACTICS[id];
-    if (this.state !== 'fighting') return '戰鬥已結束';
-    if (!this.generalAlive(side)) return '主將已陣亡';
+    if (this.state !== 'fighting') return S.t('戰鬥已結束');
+    if (!this.generalAlive(side)) return S.t('主將已陣亡');
     var cd = this.tacticCd[side][id] || 0;
-    if (cd > 0) return '冷卻中 ' + Math.ceil(cd) + ' 秒';
-    if (this.command[side] < tc.cost) return '軍令不足';
-    if (this.globalCd[side] > 0) return '剛下達過命令';
+    if (cd > 0) return S.t('冷卻中 ') + Math.ceil(cd) + S.t(' 秒');
+    if (this.command[side] < tc.cost) return S.t('軍令不足');
+    if (this.globalCd[side] > 0) return S.t('剛下達過命令');
     return '';
   };
 
@@ -165,7 +165,7 @@
     this.tacticUses[tc.name] = (this.tacticUses[tc.name] || 0) + 1;
     this.sound(tc.target && side === 1 ? 'alert' : 'tac_' + id, tx != null ? { x: tx, y: ty } : g);
     this.addText(g, tc.name + '!', tc.color, 1.4, -0.6);
-    this.notify(army.name + ' 施展「' + tc.name + '」', tc.color);
+    this.notify(army.name + S.t(' 施展「') + tc.name + S.t('」'), tc.color);
     return true;
   };
 
@@ -191,7 +191,7 @@
       if (tc.burn) self.applyBurn(caster, t, tc.burn);
       if (tc.stun) {
         self.addBuff(t, { kind: 'stun', t: tc.stun });
-        self.addText(t, '混亂', '#e070ff', 0.9, -0.4);
+        self.addText(t, S.t('混亂'), '#e070ff', 0.9, -0.4);
       }
       if (tc.fx) self.addBurst(t, tc.color, tc.fx);
     });
@@ -206,7 +206,7 @@
     g.held = !engage;             // 玩家下令待命：不會自行出陣
     g.target = null;
     g.order = null;
-    this.addText(g, engage ? '出陣!' : '撤退!', engage ? '#f8d838' : '#80c0ff', 1.0);
+    this.addText(g, engage ? S.t('出陣!') : S.t('撤退!'), engage ? '#f8d838' : '#80c0ff', 1.0);
     return true;
   };
 
@@ -363,7 +363,7 @@
     var p = free[(this.rng() * free.length) | 0];
     var chest = { id: this.chestSeq++, x: p.x, y: p.y, item: weighted(this.rng, S.CHEST_ITEMS), open: true, born: this.time };
     this.chests.push(chest);
-    this.notify('寶箱出現了！', '#f8d838');
+    this.notify(S.t('寶箱出現了！'), '#f8d838');
   };
 
   B.openChest = function (u, chest) {
@@ -378,7 +378,7 @@
       if (u.side === 0) this.lootFound.push(item);
       this.addText(u, info.name, color, 1.6, -0.6);
       this.addBurst(u, color);
-      this.notify(u.name + ' 打開裝備箱：【' + S.QUALITIES[info.q].name + '】' + info.name, color);
+      this.notify(u.name + S.t(' 打開裝備箱：【') + S.QUALITIES[info.q].name + S.t('】') + info.name, color);
       this.sound('loot_' + info.q, u);
       return;
     }
@@ -386,7 +386,7 @@
     this.chestOpens[it.name] = (this.chestOpens[it.name] || 0) + 1;
     this.addText(u, it.name, it.color, 1.4, -0.6);
     this.addBurst(u, it.color);
-    this.notify(army.name + '軍 ' + u.name + ' 開啟寶箱：' + it.name + (chest.item === 'trap' ? '！' : ''), it.color);
+    this.notify(army.name + S.t('軍 ') + u.name + S.t(' 開啟寶箱：') + it.name + (chest.item === 'trap' ? S.t('！') : ''), it.color);
     this.sound(chest.item === 'trap' ? 'boom' : 'chest', u);
 
     if (it.heal) this.heal(u, u.maxHp * it.heal);
@@ -452,7 +452,7 @@
     u.chestGoal = chest;
     u.chestForced = true;
     u.thinkCd = 0;
-    this.addText(u, '去撿!', '#f8d838', 0.8, -0.5);
+    this.addText(u, S.t('去撿!'), '#f8d838', 0.8, -0.5);
     return u;
   };
 
@@ -462,7 +462,7 @@
     if (next === this.weather) return;
     this.weather = next;
     var w = S.WEATHER[next];
-    this.notify('天候變化：' + w.name + (w.desc ? '（' + w.desc + '）' : ''), '#c0e0ff');
+    this.notify(S.t('天候變化：') + w.name + (w.desc ? S.t('（') + w.desc + S.t('）') : ''), '#c0e0ff');
   };
 
   B.fireMul = function () { return S.WEATHER[this.weather].fireMul || 1; };
@@ -492,9 +492,9 @@
     var type = S.UNIT_KINDS[(this.rng() * S.UNIT_KINDS.length) | 0];
     var u = this.addUnit(side, type, p.x, p.y, this.armies[side]);
     this.order.push(u.id);
-    this.addText(u, '伏兵!', '#f8d838', 1.6, -0.6);
+    this.addText(u, S.t('伏兵!'), '#f8d838', 1.6, -0.6);
     this.addBurst(u, '#f8d838');
-    this.notify(this.armies[side].name + '軍 伏兵' + S.UNIT_TYPES[type].name + '殺出！', '#f8d838');
+    this.notify(this.armies[side].name + S.t('軍 伏兵') + S.UNIT_TYPES[type].name + S.t('殺出！'), '#f8d838');
     this.sound('alert');
   };
 })(window.Sango);

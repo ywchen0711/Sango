@@ -51,22 +51,22 @@ window.Sango = window.Sango || {};
   // range: 射程(格)  moveTime: 走一格秒數  attackTime: 攻擊間隔秒數
   // 士兵的每項數值在開戰時隨機浮動 ±STAT_VARIANCE
   S.UNIT_TYPES = {
-    spear:   { name: '槍兵', hp: 200, mp: 40, atk: 12, def: 10, int: 5, spr: 7,
+    spear:   { name: S.t('槍兵'), hp: 200, mp: 40, atk: 12, def: 10, int: 5, spr: 7,
                range: 1, moveTime: 0.50, attackTime: 1.0 },
-    archer:  { name: '弓兵', hp: 180, mp: 60, atk: 10, def: 6,  int: 8, spr: 9,
+    archer:  { name: S.t('弓兵'), hp: 180, mp: 60, atk: 10, def: 6,  int: 8, spr: 9,
                range: 4, moveTime: 0.55, attackTime: 1.4,
                ranged: true, meleePenalty: 0.5 },       // 被貼身時物理攻擊減半
-    cavalry: { name: '騎兵', hp: 190, mp: 30, atk: 13, def: 8,  int: 4, spr: 5,
+    cavalry: { name: S.t('騎兵'), hp: 190, mp: 30, atk: 13, def: 8,  int: 4, spr: 5,
                range: 1, moveTime: 0.28, attackTime: 1.1,
                chargeBonus: 1.3 },                       // 移動後第一擊衝鋒加成
     // 主將：與士兵同一尺度，再依武將能力加成 (見 S.GENERAL_STATS)，一樣有隨機浮動
-    general: { name: '主將', hp: 0, mp: 30, atk: 6, def: 8, int: 4, spr: 6,
+    general: { name: S.t('主將'), hp: 0, mp: 30, atk: 6, def: 8, int: 4, spr: 6,
                range: 1, moveTime: 0.40, attackTime: 0.9 },
     // 野外的動物 (探索模式)：能力會隨關卡成長，見 explore.js 的 S.ANIMALS
-    wolf: { name: '野狼', hp: 115, mp: 0, atk: 10, def: 6, int: 0, spr: 4, range: 1, moveTime: 0.32, attackTime: 0.9, beast: true },
-    boar: { name: '野豬', hp: 190, mp: 0, atk: 13, def: 9, int: 0, spr: 4, range: 1, moveTime: 0.36, attackTime: 1.2, beast: true },
-    bear: { name: '熊', hp: 420, mp: 0, atk: 18, def: 12, int: 0, spr: 8, range: 1, moveTime: 0.55, attackTime: 1.5, beast: true },
-    deer: { name: '鹿', hp: 90, mp: 0, atk: 1, def: 4, int: 0, spr: 3, range: 1, moveTime: 0.28, attackTime: 2.0, beast: true }
+    wolf: { name: S.t('野狼'), hp: 115, mp: 0, atk: 10, def: 6, int: 0, spr: 4, range: 1, moveTime: 0.32, attackTime: 0.9, beast: true },
+    boar: { name: S.t('野豬'), hp: 190, mp: 0, atk: 13, def: 9, int: 0, spr: 4, range: 1, moveTime: 0.36, attackTime: 1.2, beast: true },
+    bear: { name: S.t('熊'), hp: 420, mp: 0, atk: 18, def: 12, int: 0, spr: 8, range: 1, moveTime: 0.55, attackTime: 1.5, beast: true },
+    deer: { name: S.t('鹿'), hp: 90, mp: 0, atk: 1, def: 4, int: 0, spr: 3, range: 1, moveTime: 0.28, attackTime: 2.0, beast: true }
   };
   S.STAT_VARIANCE = 0.15;
 
@@ -113,20 +113,20 @@ window.Sango = window.Sango || {};
   // debuff/buff: 數值倍率與秒數  burn: 每秒傷害 = 智力 × ratio  stun: 混亂秒數 (無法行動)
   S.SKILLS = {
     // 物理特技
-    charge:  { name: '突擊', kind: 'physical', mp: 10, power: 1.8, desc: '1.8 倍物理傷害' },
-    double:  { name: '連擊', kind: 'physical', mp: 12, power: 0.8, hits: 2, desc: '0.8 倍物理傷害 ×2' },
-    pierce:  { name: '破甲', kind: 'physical', mp: 12, power: 1.2, ignoreDef: 0.5,
-               debuff: { stat: 'def', mul: 0.7, dur: 6, label: '防↓' }, desc: '無視一半防禦，目標防禦 -30% 6 秒' },
-    sweep:   { name: '橫掃', kind: 'physical', mp: 15, power: 1.0, area: 1, desc: '波及目標周圍 1 格的敵人' },
+    charge:  { name: S.t('突擊'), kind: 'physical', mp: 10, power: 1.8, desc: S.t('1.8 倍物理傷害') },
+    double:  { name: S.t('連擊'), kind: 'physical', mp: 12, power: 0.8, hits: 2, desc: S.t('0.8 倍物理傷害 ×2') },
+    pierce:  { name: S.t('破甲'), kind: 'physical', mp: 12, power: 1.2, ignoreDef: 0.5,
+               debuff: { stat: 'def', mul: 0.7, dur: 6, label: S.t('防↓') }, desc: S.t('無視一半防禦，目標防禦 -30% 6 秒') },
+    sweep:   { name: S.t('橫掃'), kind: 'physical', mp: 15, power: 1.0, area: 1, desc: S.t('波及目標周圍 1 格的敵人') },
     // 魔法特技
-    fire:    { name: '火計', kind: 'magic', mp: 15, power: 1.2, area: 1, burn: { ratio: 0.6, dur: 4 }, element: 'fire',
-               color: '#ff7020', desc: '範圍魔法傷害並燃燒 4 秒' },
-    thunder: { name: '落雷', kind: 'magic', mp: 18, power: 2.2, color: '#ffff80', fx: 'bolt', desc: '2.2 倍魔法傷害' },
-    confuse: { name: '妖術', kind: 'magic', mp: 16, power: 0.8, stun: 2, color: '#e070ff', desc: '魔法傷害並使目標混亂 2 秒' },
-    heal:    { name: '治療', kind: 'magic', mp: 14, heal: 4, support: true, color: '#60ff90',
-               desc: '回復附近兵力最低的友軍 (智力 ×4)' },
-    rally:   { name: '鼓舞', kind: 'magic', mp: 15, support: true, radius: 2, color: '#ff9040',
-               buff: { stat: 'atk', mul: 1.25, dur: 6, label: '攻↑' }, desc: '周圍 2 格友軍攻擊 +25% 6 秒' }
+    fire:    { name: S.t('火計'), kind: 'magic', mp: 15, power: 1.2, area: 1, burn: { ratio: 0.6, dur: 4 }, element: 'fire',
+               color: '#ff7020', desc: S.t('範圍魔法傷害並燃燒 4 秒') },
+    thunder: { name: S.t('落雷'), kind: 'magic', mp: 18, power: 2.2, color: '#ffff80', fx: 'bolt', desc: S.t('2.2 倍魔法傷害') },
+    confuse: { name: S.t('妖術'), kind: 'magic', mp: 16, power: 0.8, stun: 2, color: '#e070ff', desc: S.t('魔法傷害並使目標混亂 2 秒') },
+    heal:    { name: S.t('治療'), kind: 'magic', mp: 14, heal: 4, support: true, color: '#60ff90',
+               desc: S.t('回復附近兵力最低的友軍 (智力 ×4)') },
+    rally:   { name: S.t('鼓舞'), kind: 'magic', mp: 15, support: true, radius: 2, color: '#ff9040',
+               buff: { stat: 'atk', mul: 1.25, dur: 6, label: S.t('攻↑') }, desc: S.t('周圍 2 格友軍攻擊 +25% 6 秒') }
   };
   S.PHYSICAL_SKILLS = ['charge', 'double', 'pierce', 'sweep'];
   S.MAGIC_SKILLS = ['fire', 'thunder', 'confuse', 'heal', 'rally'];
@@ -143,16 +143,16 @@ window.Sango = window.Sango || {};
   // target: 需要在戰場上點選位置  radius: 影響範圍 (格)  power: 以主將智力計算的魔法傷害倍率
   // buff.scale: 依主將能力加成 (mul + 能力 / scale)
   S.TACTICS = {
-    fire:    { name: '火計', key: '1', cost: 4, cd: 12, target: true, radius: 1, power: 1.6, element: 'fire',
-               burn: { ratio: 0.6, dur: 5 }, color: '#ff7020', desc: '指定位置 3×3 範圍魔法傷害並燃燒 5 秒（依主將智力）' },
-    thunder: { name: '落雷', key: '2', cost: 5, cd: 14, target: true, radius: 0, power: 3.2, stun: 2.5,
-               color: '#ffff80', fx: 'bolt', desc: '對單一敵隊造成大量魔法傷害並混亂 2.5 秒（依主將智力）' },
-    rally:   { name: '鼓舞', key: '3', cost: 4, cd: 16, color: '#ff9040',
-               buff: { stat: 'atk', mul: 1.0, from: 'war', scale: 200, dur: 8, label: '攻↑' },
-               desc: '全軍攻擊提升 8 秒（依主將武力）' },
-    guard:   { name: '堅守', key: '4', cost: 3, cd: 16, color: '#60a0ff',
-               buff: { stat: 'def', mul: 1.15, from: 'lead', scale: 500, dur: 8, label: '防↑' },
-               desc: '全軍防禦提升 8 秒（依主將統率）' }
+    fire:    { name: S.t('火計'), key: '1', cost: 4, cd: 12, target: true, radius: 1, power: 1.6, element: 'fire',
+               burn: { ratio: 0.6, dur: 5 }, color: '#ff7020', desc: S.t('指定位置 3×3 範圍魔法傷害並燃燒 5 秒（依主將智力）') },
+    thunder: { name: S.t('落雷'), key: '2', cost: 5, cd: 14, target: true, radius: 0, power: 3.2, stun: 2.5,
+               color: '#ffff80', fx: 'bolt', desc: S.t('對單一敵隊造成大量魔法傷害並混亂 2.5 秒（依主將智力）') },
+    rally:   { name: S.t('鼓舞'), key: '3', cost: 4, cd: 16, color: '#ff9040',
+               buff: { stat: 'atk', mul: 1.0, from: 'war', scale: 200, dur: 8, label: S.t('攻↑') },
+               desc: S.t('全軍攻擊提升 8 秒（依主將武力）') },
+    guard:   { name: S.t('堅守'), key: '4', cost: 3, cd: 16, color: '#60a0ff',
+               buff: { stat: 'def', mul: 1.15, from: 'lead', scale: 500, dur: 8, label: S.t('防↑') },
+               desc: S.t('全軍防禦提升 8 秒（依主將統率）') }
   };
   S.TACTIC_IDS = ['fire', 'thunder', 'rally', 'guard'];
   // 計策的魔法傷害以「計策智力 = base + 武將智力 × ratio」計算 (比主將本身的智力起伏小，避免智將一面倒)
@@ -169,23 +169,23 @@ window.Sango = window.Sango || {};
   };
   // weight: 出現權重
   S.CHEST_ITEMS = {
-    potion: { name: '傷藥', weight: 3, heal: 0.5, color: '#60ff90', desc: '開啟的部隊回復 50% 兵力' },
-    food:   { name: '兵糧', weight: 2, healAll: 0.12, color: '#a0ff60', desc: '全軍回復 12% 兵力' },
-    book:   { name: '兵書', weight: 3, command: 3, color: '#f8d838', desc: '軍令 +3' },
-    sword:  { name: '寶劍', weight: 2, buff: { stat: 'atk', mul: 1.4, dur: 20, label: '攻↑' }, color: '#ff6040',
-              desc: '開啟的部隊攻擊 +40% 20 秒' },
-    armor:  { name: '鎧甲', weight: 2, buff: { stat: 'def', mul: 1.5, dur: 20, label: '防↑' }, color: '#60a0ff',
-              desc: '開啟的部隊防禦 +50% 20 秒' },
-    trap:   { name: '陷阱', weight: 2, damage: 0.3, stun: 2, color: '#ff4040', desc: '爆炸！損失 30% 兵力並混亂 2 秒' }
+    potion: { name: S.t('傷藥'), weight: 3, heal: 0.5, color: '#60ff90', desc: S.t('開啟的部隊回復 50% 兵力') },
+    food:   { name: S.t('兵糧'), weight: 2, healAll: 0.12, color: '#a0ff60', desc: S.t('全軍回復 12% 兵力') },
+    book:   { name: S.t('兵書'), weight: 3, command: 3, color: '#f8d838', desc: S.t('軍令 +3') },
+    sword:  { name: S.t('寶劍'), weight: 2, buff: { stat: 'atk', mul: 1.4, dur: 20, label: S.t('攻↑') }, color: '#ff6040',
+              desc: S.t('開啟的部隊攻擊 +40% 20 秒') },
+    armor:  { name: S.t('鎧甲'), weight: 2, buff: { stat: 'def', mul: 1.5, dur: 20, label: S.t('防↑') }, color: '#60a0ff',
+              desc: S.t('開啟的部隊防禦 +50% 20 秒') },
+    trap:   { name: S.t('陷阱'), weight: 2, damage: 0.3, stun: 2, color: '#ff4040', desc: S.t('爆炸！損失 30% 兵力並混亂 2 秒') }
   };
 
   // 天候：每隔一段時間可能變化，影響火攻與射程
   S.WEATHER_CHANGE = [15, 30];     // 幾秒判定一次天候變化
   S.WEATHER = {
-    clear: { name: '晴天', weight: 4 },
-    wind:  { name: '大風', weight: 2, fireMul: 1.5, burnBonus: 2, desc: '火攻傷害 +50%、燃燒延長' },
-    rain:  { name: '大雨', weight: 2, fireMul: 0.4, noBurn: true, desc: '火攻傷害大減且不會燃燒' },
-    fog:   { name: '濃霧', weight: 2, rangeMinus: 2, desc: '弓兵射程 -2' }
+    clear: { name: S.t('晴天'), weight: 4 },
+    wind:  { name: S.t('大風'), weight: 2, fireMul: 1.5, burnBonus: 2, desc: S.t('火攻傷害 +50%、燃燒延長') },
+    rain:  { name: S.t('大雨'), weight: 2, fireMul: 0.4, noBurn: true, desc: S.t('火攻傷害大減且不會燃燒') },
+    fog:   { name: S.t('濃霧'), weight: 2, rangeMinus: 2, desc: S.t('弓兵射程 -2') }
   };
 
   // 伏兵：每場最多一次，於指定時間後機率出現，偏向兵力較少的一方
@@ -241,7 +241,7 @@ window.Sango = window.Sango || {};
     REPLAY_RATE: 0.5,              // 重打已過關卡的獎勵倍率
     LOSS_EXP_RATE: 0.3             // 戰敗仍可獲得的經驗值比例 (沒有金錢)
   };
-  S.STAT_NAMES = { hp: '體力', war: '武力', int: '智力', lead: '統率' };
+  S.STAT_NAMES = { hp: S.t('體力'), war: S.t('武力'), int: S.t('智力'), lead: S.t('統率') };
   S.STAT_KEYS = ['hp', 'war', 'int', 'lead'];
   // 兵種等級：每級該兵種 HP / MP / 攻擊 / 防禦 / 智力 / 精神 +BONUS
   S.LEVEL = { BONUS: 0.05, MAX: 40 };
@@ -251,11 +251,11 @@ window.Sango = window.Sango || {};
 
   // ---- 裝備 (品質、詞綴、套裝、暗金的資料與邏輯在 js/items.js) ----
   // 仿暗黑破壞神 2 的 10 個裝備位置；物品部位 (ITEM_SLOTS) 只有 9 種，戒指可以戴兩枚
-  S.ITEM_SLOTS = { weapon: '武器', shield: '副手', helm: '頭盔', armor: '鎧甲', gloves: '護手',
-                   belt: '腰帶', boots: '戰靴・坐騎', amulet: '護符', ring: '戒指' };
+  S.ITEM_SLOTS = { weapon: S.t('武器'), shield: S.t('副手'), helm: S.t('頭盔'), armor: S.t('鎧甲'), gloves: S.t('護手'),
+                   belt: S.t('腰帶'), boots: S.t('戰靴・坐騎'), amulet: S.t('護符'), ring: S.t('戒指') };
   S.ITEM_SLOT_KEYS = ['weapon', 'shield', 'helm', 'armor', 'gloves', 'belt', 'boots', 'amulet', 'ring'];
-  S.EQUIP_SLOTS = { helm: '頭盔', amulet: '護符', weapon: '武器', armor: '鎧甲', shield: '副手',
-                    ring1: '戒指', belt: '腰帶', ring2: '戒指', gloves: '護手', boots: '戰靴・坐騎' };
+  S.EQUIP_SLOTS = { helm: S.t('頭盔'), amulet: S.t('護符'), weapon: S.t('武器'), armor: S.t('鎧甲'), shield: S.t('副手'),
+                    ring1: S.t('戒指'), belt: S.t('腰帶'), ring2: S.t('戒指'), gloves: S.t('護手'), boots: S.t('戰靴・坐騎') };
   S.EQUIP_SLOT_KEYS = ['helm', 'amulet', 'weapon', 'armor', 'shield', 'ring1', 'belt', 'ring2', 'gloves', 'boots'];
   S.equipKeysFor = function (itemSlot) { return itemSlot === 'ring' ? ['ring1', 'ring2'] : [itemSlot]; };
 
@@ -276,40 +276,40 @@ window.Sango = window.Sango || {};
   // lv：敵軍全體等級加成 (再加上 perStage × 關卡序號)  ilvl：掉落物品等級加成  reward：金錢 / 經驗倍率
   // elite：一般出征時每隊敵兵成為精英的機率  campElite：探索模式每座敵營有精英的機率
   S.DIFFICULTIES = {
-    normal:    { name: '普通', lv: 0,  perStage: 0.12,ilvl: 0,  reward: 1,   elite: 0.05, campElite: 0.5,  color: '#e8e8f0' },
-    nightmare: { name: '噩夢', lv: 5,  perStage: 0.65,ilvl: 10, reward: 2.5, elite: 0.15, campElite: 0.75, color: '#ff9040' },
-    hell:      { name: '地獄', lv: 10, perStage: 1.0, ilvl: 20, reward: 5,   elite: 0.25, campElite: 1,    color: '#ff4040' }
+    normal:    { name: S.t('普通'), lv: 0,  perStage: 0.12,ilvl: 0,  reward: 1,   elite: 0.05, campElite: 0.5,  color: '#e8e8f0' },
+    nightmare: { name: S.t('噩夢'), lv: 5,  perStage: 0.65,ilvl: 10, reward: 2.5, elite: 0.15, campElite: 0.75, color: '#ff9040' },
+    hell:      { name: S.t('地獄'), lv: 10, perStage: 1.0, ilvl: 20, reward: 5,   elite: 0.25, campElite: 1,    color: '#ff4040' }
   };
   S.DIFFICULTY_KEYS = ['normal', 'nightmare', 'hell'];
   S.STAGES = [
-    { title: '黃巾之亂', general: { name: '程遠志', hp: 45, war: 52, int: 20, lead: 30, beard: '#403020' },
+    { title: S.t('黃巾之亂'), general: { name: S.t('程遠志'), hp: 45, war: 52, int: 20, lead: 30, beard: '#403020' },
       units: ['spear', 'spear', 'archer', 'archer'], lv: 0, gold: 120, exp: 100 },
-    { title: '廣宗之戰', general: { name: '張寶', hp: 55, war: 45, int: 72, lead: 45, beard: '#202020' },
+    { title: S.t('廣宗之戰'), general: { name: S.t('張寶'), hp: 55, war: 45, int: 72, lead: 45, beard: '#202020' },
       units: ['spear', 'spear', 'archer', 'archer', 'cavalry'], lv: 0, gold: 140, exp: 150 },
-    { title: '汜水關', general: { name: '華雄', hp: 80, war: 86, int: 35, lead: 60, beard: '#282018' },
+    { title: S.t('汜水關'), general: { name: S.t('華雄'), hp: 80, war: 86, int: 35, lead: 60, beard: '#282018' },
       units: ['spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 1 }, gold: 160, exp: 200, drops: [{ quality: 'rare' }] },
-    { title: '壽春討伐', general: { name: '紀靈', hp: 75, war: 82, int: 42, lead: 70, beard: null },
+    { title: S.t('壽春討伐'), general: { name: S.t('紀靈'), hp: 75, war: 82, int: 42, lead: 70, beard: null },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 180, exp: 250 },
-    { title: '白馬之圍', general: { name: '顏良', hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
+    { title: S.t('白馬之圍'), general: { name: S.t('顏良'), hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1 }, gold: 200, exp: 300, drops: [{ unique: 'dilu' }] },
-    { title: '延津之戰', general: { name: '文醜', hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
+    { title: S.t('延津之戰'), general: { name: S.t('文醜'), hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 1, cavalry: 2 }, gold: 220, exp: 350, drops: [{ unique: 'warDrum' }] },
-    { title: '合肥之戰', general: { name: '張遼', hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
+    { title: S.t('合肥之戰'), general: { name: S.t('張遼'), hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 3 }, gold: 240, exp: 400 },
-    { title: '博望坡', general: { name: '夏侯惇', hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
+    { title: S.t('博望坡'), general: { name: S.t('夏侯惇'), hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 4 }, gold: 260, exp: 450, drops: [{ unique: 'qinggang' }] },
-    { title: '樊城之戰', general: { name: '關羽', hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
+    { title: S.t('樊城之戰'), general: { name: S.t('關羽'), hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 4, cavalry: 4 }, gold: 300, exp: 500, drops: [{ set: 'dragonBlade' }] },
-    { title: '虎牢關', general: { name: '呂布', hp: 98, war: 100, int: 26, lead: 85, beard: null },
+    { title: S.t('虎牢關'), general: { name: S.t('呂布'), hp: 98, war: 100, int: 26, lead: 85, beard: null },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 6, spear: 6, archer: 5, cavalry: 6 }, gold: 500, exp: 600, drops: [{ set: 'halberd' }, { set: 'redHare' }] }
   ];
 
   // ---- 雙方軍隊 (hp=體力 war=武力 int=智力 lead=統率；統率提升士兵防禦) ----
   // 為了公平：預設兩軍兵種編成相同，武將能力取捨不同但總體戰力相當 (以 tools/simulate.js 驗證約 50:50)
   S.DEFAULT_ARMIES = [
-    { name: '于禁', hp: 85, war: 78, int: 58, lead: 84, beard: null,
+    { name: S.t('于禁'), hp: 85, war: 78, int: 58, lead: 84, beard: null,
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'] },
-    { name: '張飛', hp: 88, war: 98, int: 30, lead: 63, beard: '#282018',
+    { name: S.t('張飛'), hp: 88, war: 98, int: 30, lead: 63, beard: '#282018',
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'] }
   ];
 })(window.Sango);

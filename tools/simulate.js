@@ -6,7 +6,7 @@ const path = require('path');
 const vm = require('vm');
 
 global.window = {};
-for (const f of ['config.js', 'sprites.js', 'battle.js', 'tactics.js', 'elites.js', 'skills.js']) {
+for (const f of ['i18n.js', 'config.js', 'sprites.js', 'battle.js', 'tactics.js', 'elites.js', 'skills.js']) {
   vm.runInThisContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), { filename: f });
 }
 const S = window.Sango;

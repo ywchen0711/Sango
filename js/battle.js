@@ -157,7 +157,7 @@
     this.initEvents(opts);
     if (this.explore) {
       // 探索：野外 + 洞穴 / 迷宮，每個區域各有自己的地圖、牆、佔位、迷霧、寶箱與出入口
-      var areas = this.explore.areas || [{ name: '野外', theme: 'grass', map: this.explore.map, chests: this.explore.chests, shrines: this.explore.shrines, portals: [] }];
+      var areas = this.explore.areas || [{ name: S.t('野外'), theme: 'grass', map: this.explore.map, chests: this.explore.chests, shrines: this.explore.shrines, portals: [] }];
       this.areas = areas.map(function (a) {
         var W = a.map[0].length, H = a.map.length, walls = new Array(W * H), occ = new Array(W * H);
         for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
@@ -282,7 +282,7 @@
     this.visionT = 0;
     this.updateVision();
     var a = this.areas[p.to];
-    this.notify(p.to === 0 ? '回到野外' : '進入 ' + a.name + (a.kind === 'labyrinth' ? '（迷宮深處藏有寶物）' : ''), '#c0e0ff');
+    this.notify(p.to === 0 ? S.t('回到野外') : S.t('進入 ') + a.name + (a.kind === 'labyrinth' ? S.t('（迷宮深處藏有寶物）') : ''), '#c0e0ff');
     this.sound('reinforce');
   };
 
@@ -317,7 +317,7 @@
     });
     if (camp === 0 && !this.bossAwake) {
       this.bossAwake = true;
-      this.notify('敵將 ' + this.armies[1].name + ' 察覺了你！', '#ff6040');
+      this.notify(S.t('敵將 ') + this.armies[1].name + S.t(' 察覺了你！'), '#ff6040');
       this.sound('bossAlert');
     }
   };
@@ -331,8 +331,8 @@
     var item = S.rollLoot(this.explore.ilvl, this.mf);
     this.lootFound.push(item);
     var info = S.itemInfo(item);
-    this.addText(last, '戰利品!', S.QUALITIES[info.q].color, 1.6, -0.6);
-    this.notify('擊破敵營！獲得【' + S.QUALITIES[info.q].name + '】' + info.name, S.QUALITIES[info.q].color);
+    this.addText(last, S.t('戰利品!'), S.QUALITIES[info.q].color, 1.6, -0.6);
+    this.notify(S.t('擊破敵營！獲得【') + S.QUALITIES[info.q].name + S.t('】') + info.name, S.QUALITIES[info.q].color);
     this.sound('loot_' + info.q);
   };
 
@@ -341,11 +341,11 @@
     var sol = e.wanderer, chance = S.EXPLORE.RECRUIT_CHANCE[sol.q] || 0.3;
     if (this.rng() < chance) {
       this.recruited.push(sol);
-      this.addText(e, '願意加入!', '#80ff80', 2.0, -1.0);
-      this.notify(S.soldierFullName(sol) + '（' + S.CLASSES[sol.cls].name + '）被你的武勇折服，願意加入！', '#80ff80');
+      this.addText(e, S.t('願意加入!'), '#80ff80', 2.0, -1.0);
+      this.notify(S.soldierFullName(sol) + S.t('（') + S.CLASSES[sol.cls].name + S.t('）被你的武勇折服，願意加入！'), '#80ff80');
       this.sound(sol.q === 'unique' ? 'loot_unique' : 'shrine', e);
     } else {
-      this.notify(S.soldierFullName(sol) + ' 敗走了…', '#a0a0b0');
+      this.notify(S.soldierFullName(sol) + S.t(' 敗走了…'), '#a0a0b0');
     }
   };
 
@@ -368,8 +368,8 @@
           u.x = u.fromX = x; u.y = u.fromY = y; u.moveT = u.moveDur = 0;
           u.area = this.area;
           this.occ[this.idx(x, y)] = u;
-          this.addText(u, '援軍!', '#80c0ff', 1.4, -0.6);
-          this.notify(u.name + ' 歸隊了！', '#80c0ff');
+          this.addText(u, S.t('援軍!'), '#80c0ff', 1.4, -0.6);
+          this.notify(u.name + S.t(' 歸隊了！'), '#80c0ff');
           this.sound('reinforce');
           return;
         }
@@ -441,8 +441,8 @@
   Battle.prototype.animalKilled = function (e) {
     if (e.animal === 'deer') {
       this.alive(0).forEach(function (a) { a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.15); });
-      this.addText(e, '獵到鹿!', '#80ff80', 1.4, -0.6);
-      this.notify('獵到一頭鹿，全軍飽餐一頓，兵力回復 15%', '#80ff80');
+      this.addText(e, S.t('獵到鹿!'), '#80ff80', 1.4, -0.6);
+      this.notify(S.t('獵到一頭鹿，全軍飽餐一頓，兵力回復 15%'), '#80ff80');
       this.sound('shrine', e);
       return;
     }
@@ -450,8 +450,8 @@
     if (this.rng() >= chance) return;
     var item = S.rollLoot(this.explore.ilvl, this.mf), info = S.itemInfo(item);
     this.lootFound.push(item);
-    this.addText(e, '戰利品!', S.QUALITIES[info.q].color, 1.6, -0.6);
-    this.notify('打倒' + e.name + '，獲得【' + S.QUALITIES[info.q].name + '】' + info.name, S.QUALITIES[info.q].color);
+    this.addText(e, S.t('戰利品!'), S.QUALITIES[info.q].color, 1.6, -0.6);
+    this.notify(S.t('打倒') + e.name + S.t('，獲得【') + S.QUALITIES[info.q].name + S.t('】') + info.name, S.QUALITIES[info.q].color);
     this.sound('loot_' + info.q, e);
   };
 
@@ -642,7 +642,7 @@
       var friends = this.alive(u.side).length - 1;
       if (near || friends <= S.GENERAL_ENGAGE_FRIENDS || this.time >= S.GENERAL_HOLD_TIME) {
         u.engaged = true;
-        this.addText(u, '出陣!', '#f8d838', 1.0);
+        this.addText(u, S.t('出陣!'), '#f8d838', 1.0);
       } else {
         u.thinkCd = 0.3;
         return;
@@ -942,7 +942,7 @@
         if (hit.ranged) dmg = Math.max(1, Math.round(dmg * (this.terrainAt(t.x, t.y).rangedDef || 1)));   // 森林擋箭
         if (procs && procs.crit && this.rng() < procs.crit / 100) {
           dmg *= 2;
-          this.addText(t, '致命!', '#ff4060', 0.9, -0.9);
+          this.addText(t, S.t('致命!'), '#ff4060', 0.9, -0.9);
         }
         this.applyDamage(t, dmg, hit.magic ? '#e0b0ff' : null);
         if (u.elite) this.eliteOnHit(u, dmg);
@@ -957,7 +957,7 @@
       if (sk.burn) this.applyBurn(u, t, sk.burn);
       if (sk.stun) {
         this.addBuff(t, { kind: 'stun', t: sk.stun });
-        this.addText(t, '混亂', '#e070ff', 0.9, -0.4);
+        this.addText(t, S.t('混亂'), '#e070ff', 0.9, -0.4);
       }
       if (hit.skill) this.addBurst(t, sk.color || '#ffffff', sk.fx);
       else if (hit.magic) this.addBurst(t, MAGIC_COLOR);
@@ -1010,7 +1010,7 @@
       // 背擊：從目標面向的反方向攻擊
       if (u.x != null && e.facing && u.x !== e.x && (u.x - e.x) * e.facing < 0) {
         mul *= S.BACKSTAB;
-        if (u.side === 0 && this.rng() < 0.35) this.addText(e, '背擊!', '#ffb040', 0.7, -0.9);
+        if (u.side === 0 && this.rng() < 0.35) this.addText(e, S.t('背擊!'), '#ffb040', 0.7, -0.9);
       }
     }
     // 陣型：散開的士兵攻擊 -10%、方陣的士兵防禦 +20%
@@ -1038,10 +1038,10 @@
     if (procs.burn && this.rng() < procs.burn / 100) this.applyBurn(u, t, { ratio: 0.3, dur: 3 });
     if (procs.stun && !t.findBuff('stun') && this.rng() < procs.stun / 100) {
       this.addBuff(t, { kind: 'stun', t: 1 });
-      this.addText(t, '雷霆', '#ffff80', 0.8, -0.4);
+      this.addText(t, S.t('雷霆'), '#ffff80', 0.8, -0.4);
     }
     if (procs.slow && this.rng() < procs.slow / 100) {
-      if (!t.findBuff('slow')) this.addText(t, '緩速', '#80d0ff', 0.8, -0.4);
+      if (!t.findBuff('slow')) this.addText(t, S.t('緩速'), '#80d0ff', 0.8, -0.4);
       this.addBuff(t, { kind: 'slow', t: 2 });
     }
   };
@@ -1091,10 +1091,10 @@
     var army = this.armies[e.side];
     this.sound(e.isGeneral ? 'generalDeath' : 'death', e);
     if (e.isGeneral) {
-      this.addText(e, army.name + ' 陣亡', '#ff5040', 1.6);
-      this.log.push(this.time.toFixed(1) + 's ' + army.name + ' 陣亡');
+      this.addText(e, army.name + S.t(' 陣亡'), '#ff5040', 1.6);
+      this.log.push(this.time.toFixed(1) + 's ' + army.name + S.t(' 陣亡'));
     } else {
-      this.log.push(this.time.toFixed(1) + 's ' + army.name + '軍 ' + e.name + ' 潰滅');
+      this.log.push(this.time.toFixed(1) + 's ' + army.name + S.t('軍 ') + e.name + S.t(' 潰滅'));
     }
     if (e.elite) this.eliteOnKill(e);
     if (e.animal) this.animalKilled(e);

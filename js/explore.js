@@ -33,22 +33,22 @@
 
   // ---- 地貌 (地圖字元)：wall 不能通過；move 移動時間倍率；rangedDef 站在上面受到的遠程傷害倍率；burn 每秒損失最大兵力的比例 ----
   S.TERRAIN = {
-    '.': { name: '平地' },
-    '#': { name: '岩石', wall: true },
-    '~': { name: '深水', wall: true },
-    'T': { name: '樹木', wall: true },
-    'f': { name: '森林', move: 1.25, rangedDef: 0.75, desc: '移動稍慢，受到的遠程傷害 -25%' },
-    's': { name: '沼澤', move: 1.7, desc: '移動很慢' },
-    'i': { name: '冰原', move: 0.75, desc: '移動加快' },
-    'l': { name: '熔岩', move: 1.1, burn: 0.04, desc: '站在上面每秒損失 4% 兵力' }
+    '.': { name: S.t('平地') },
+    '#': { name: S.t('岩石'), wall: true },
+    '~': { name: S.t('深水'), wall: true },
+    'T': { name: S.t('樹木'), wall: true },
+    'f': { name: S.t('森林'), move: 1.25, rangedDef: 0.75, desc: S.t('移動稍慢，受到的遠程傷害 -25%') },
+    's': { name: S.t('沼澤'), move: 1.7, desc: S.t('移動很慢') },
+    'i': { name: S.t('冰原'), move: 0.75, desc: S.t('移動加快') },
+    'l': { name: S.t('熔岩'), move: 1.1, burn: 0.04, desc: S.t('站在上面每秒損失 4% 兵力') }
   };
 
   // ---- 動物：aggro = 我軍靠近幾格會被驚動；passive = 不攻擊、會逃跑 ----
   S.ANIMALS = {
-    wolf: { name: '野狼', aggro: 8, pack: [2, 3], desc: '成群出沒，主動攻擊' },
-    boar: { name: '野豬', aggro: 3, pack: [1, 2], desc: '靠近或被攻擊才會衝撞' },
-    bear: { name: '熊',   aggro: 5, pack: [1, 1], desc: '強悍，打倒可能掉落裝備' },
-    deer: { name: '鹿',   aggro: 6, pack: [2, 3], passive: true, desc: '會逃跑，獵到可讓全軍回復兵力' }
+    wolf: { name: S.t('野狼'), aggro: 8, pack: [2, 3], desc: S.t('成群出沒，主動攻擊') },
+    boar: { name: S.t('野豬'), aggro: 3, pack: [1, 2], desc: S.t('靠近或被攻擊才會衝撞') },
+    bear: { name: S.t('熊'),   aggro: 5, pack: [1, 1], desc: S.t('強悍，打倒可能掉落裝備') },
+    deer: { name: S.t('鹿'),   aggro: 6, pack: [2, 3], passive: true, desc: S.t('會逃跑，獵到可讓全軍回復兵力') }
   };
   // 動物的能力 (preset)：隨關卡 / 難度的等級成長
   S.animalPreset = function (kind, lv) {
@@ -323,7 +323,7 @@
     }
 
     // ---- 洞穴 / 地下迷宮 ----
-    var areas = [{ name: '野外', theme: 'grass', cols: W, rows: H, chests: chests, shrines: shrines, portals: [] }];
+    var areas = [{ name: S.t('野外'), theme: 'grass', cols: W, rows: H, chests: chests, shrines: shrines, portals: [] }];
     var nCaves = ri(E.CAVES[0], E.CAVES[1]), caveSpots = [];
     for (i = 0; i < nCaves; i++) {
       var ent = P.spot(rng, [{ x: start.x, y: start.y, gap: 16 }, { x: boss.x, y: boss.y, gap: 16 }]
@@ -406,11 +406,11 @@
           addCamp(areaIdx, CP, mc.x, mc.y, 2 + sizeBonus, D.campElite);
         }
       }
-      var names = kind === 'cavern' ? ['黑風洞', '盤蛇窟', '幽谷洞', '寒潭洞', '赤焰窟'] : ['八陣迷宮', '地下迷城', '幽冥迷宮', '鬼門迷宮'];
+      var names = kind === 'cavern' ? [S.t('黑風洞'), S.t('盤蛇窟'), S.t('幽谷洞'), S.t('寒潭洞'), S.t('赤焰窟')] : [S.t('八陣迷宮'), S.t('地下迷城'), S.t('幽冥迷宮'), S.t('鬼門迷宮')];
       return {
         name: names[Math.floor(rng() * names.length)], theme: 'cave', kind: kind, cols: CW, rows: CH,
         map: cg.map(function (row) { return row.join(''); }), entry: entry, chests: chestsC, shrines: [],
-        portals: [{ x: entry.x - 1 >= 1 ? entry.x - 1 : entry.x, y: entry.y, to: 0, tx: back.x, ty: back.y, name: '出口', exit: true }]
+        portals: [{ x: entry.x - 1 >= 1 ? entry.x - 1 : entry.x, y: entry.y, to: 0, tx: back.x, ty: back.y, name: S.t('出口'), exit: true }]
       };
     }
     // 洞穴的出口要能站：入口格本身就是平地

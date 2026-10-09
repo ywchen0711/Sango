@@ -11,12 +11,12 @@
 
   S.ELITE_HP = 2;
   S.ELITE_AFFIXES = {
-    berserk:  { name: '狂暴', desc: '攻擊 ×1.5' },
-    swift:    { name: '疾風', desc: '移動與攻擊加快' },
-    stone:    { name: '石膚', desc: '防禦 ×1.8' },
-    vampire:  { name: '吸血', desc: '造成傷害的 25% 回復自己' },
-    fire:     { name: '火焰', desc: '死亡時爆炸，燒傷周圍敵人' },
-    summoner: { name: '召喚', desc: '第一次遇敵時叫出兩隊援兵' }
+    berserk:  { name: S.t('狂暴'), desc: S.t('攻擊 ×1.5') },
+    swift:    { name: S.t('疾風'), desc: S.t('移動與攻擊加快') },
+    stone:    { name: S.t('石膚'), desc: S.t('防禦 ×1.8') },
+    vampire:  { name: S.t('吸血'), desc: S.t('造成傷害的 25% 回復自己') },
+    fire:     { name: S.t('火焰'), desc: S.t('死亡時爆炸，燒傷周圍敵人') },
+    summoner: { name: S.t('召喚'), desc: S.t('第一次遇敵時叫出兩隊援兵') }
   };
   S.ELITE_KEYS = Object.keys(S.ELITE_AFFIXES);
 
@@ -36,7 +36,7 @@
       if (id === 'swift') { u.moveTime *= 0.6; u.attackTime *= 0.75; }
       if (id === 'stone') { u.def = Math.round(u.def * 1.8); u.spr = Math.round(u.spr * 1.5); }
     });
-    u.name = ids.map(function (id) { return S.ELITE_AFFIXES[id].name; }).join('・') + '的' + u.name;
+    u.name = ids.map(function (id) { return S.ELITE_AFFIXES[id].name; }).join(S.t('・')) + S.t('的') + u.name;
   };
   B.hasElite = function (u, id) { return !!u.elite && u.elite.indexOf(id) >= 0; };
 
@@ -53,7 +53,7 @@
     var self = this;
     if (this.hasElite(e, 'fire')) {
       this.addBurst(e, '#ff6020', 'boom');
-      this.addText(e, '爆炸!', '#ff6020', 1.2, -0.6);
+      this.addText(e, S.t('爆炸!'), '#ff6020', 1.2, -0.6);
       this.sound('boom', e);
       this.alive(1 - e.side).forEach(function (o) {
         if (cheb(o.x, o.y, e.x, e.y) > 1) return;
@@ -67,7 +67,7 @@
     var info = S.itemInfo(item), color = S.QUALITIES[info.q].color;
     this.lootFound.push(item);
     this.addText(e, info.name, color, 1.6, -1.1);
-    this.notify('擊倒精英 ' + e.name + '！獲得【' + S.QUALITIES[info.q].name + '】' + info.name, color);
+    this.notify(S.t('擊倒精英 ') + e.name + S.t('！獲得【') + S.QUALITIES[info.q].name + S.t('】') + info.name, color);
     this.sound('loot_' + info.q, e);
   };
 
@@ -99,20 +99,20 @@
       }
     }
     if (n) {
-      this.addText(u, '召喚!', '#c080ff', 1.2, -0.6);
-      this.notify(u.name + ' 叫出了援兵！', '#c080ff');
+      this.addText(u, S.t('召喚!'), '#c080ff', 1.2, -0.6);
+      this.notify(u.name + S.t(' 叫出了援兵！'), '#c080ff');
       this.sound('summon', u);
     }
   };
 
   // ======================= 神壇 (探索模式) =======================
   S.SHRINES = {
-    war:     { name: '戰神壇', color: '#ff6040', desc: '全軍攻擊 +30%，60 秒' },
-    guard:   { name: '守護壇', color: '#60a0ff', desc: '全軍防禦 +40%，60 秒' },
-    heal:    { name: '回春壇', color: '#60ff90', desc: '全軍兵力全滿，一隊陣亡士兵歸隊' },
-    exp:     { name: '經驗壇', color: '#80e0ff', desc: '這場戰鬥的經驗值 +50%' },
-    fortune: { name: '財寶壇', color: '#f8d838', desc: '立刻獲得一件稀有裝備' },
-    command: { name: '軍令壇', color: '#e070ff', desc: '軍令全滿，計策冷卻歸零' }
+    war:     { name: S.t('戰神壇'), color: '#ff6040', desc: S.t('全軍攻擊 +30%，60 秒') },
+    guard:   { name: S.t('守護壇'), color: '#60a0ff', desc: S.t('全軍防禦 +40%，60 秒') },
+    heal:    { name: S.t('回春壇'), color: '#60ff90', desc: S.t('全軍兵力全滿，一隊陣亡士兵歸隊') },
+    exp:     { name: S.t('經驗壇'), color: '#80e0ff', desc: S.t('這場戰鬥的經驗值 +50%') },
+    fortune: { name: S.t('財寶壇'), color: '#f8d838', desc: S.t('立刻獲得一件稀有裝備') },
+    command: { name: S.t('軍令壇'), color: '#e070ff', desc: S.t('軍令全滿，計策冷卻歸零') }
   };
   S.SHRINE_KEYS = Object.keys(S.SHRINES);
 
@@ -134,7 +134,7 @@
     if (sh.type === 'command') { this.command[0] = S.COMMAND.MAX; this.tacticCd[0] = {}; this.globalCd[0] = 0; }
     mine.forEach(function (a) { if (cheb(a.x, a.y, u.x, u.y) <= 6) self.addBurst(a, def.color); });
     this.addText(u, def.name, def.color, 1.8, -0.6);
-    this.notify('啟動' + def.name + '：' + def.desc, def.color);
+    this.notify(S.t('啟動') + def.name + S.t('：') + def.desc, def.color);
     this.sound('shrine', u);
   };
 })(window.Sango);

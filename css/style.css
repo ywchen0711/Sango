@@ -381,3 +381,8 @@ button.explore:hover:not(:disabled) { background: #3a6a9a; }
   .camp-tabs { flex-wrap: nowrap; overflow-x: auto; }
   .camp-tabs button { padding: 7px 10px; font-size: 14px; white-space: nowrap; flex: 0 0 auto; }
 }
+
+/* ---- 語言切換 ---- */
+.lang-btn { position: fixed; top: 8px; right: 8px; z-index: 50; padding: 4px 12px; font-size: 13px; font-weight: bold;
+            background: rgba(40, 40, 52, 0.9); border: 1px solid #5a5a70; border-radius: 14px; color: #f8d838; }
+.lang-btn:hover { border-color: #f8d838; }

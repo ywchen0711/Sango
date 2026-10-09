@@ -37,7 +37,7 @@
     try {
       if (profile) localStorage.setItem(GUEST_KEY, JSON.stringify(profile));
       else localStorage.removeItem(GUEST_KEY);
-    } catch (e) { message('瀏覽器無法儲存進度', true); }
+    } catch (e) { message(S.t('瀏覽器無法儲存進度'), true); }
   }
 
   // ======================= Supabase =======================
@@ -51,7 +51,7 @@
       if (!guest) return null;
       return saveCloud(guest).then(function () {
         saveGuest(null);
-        message('已把訪客進度存到帳號');
+        message(S.t('已把訪客進度存到帳號'));
         return guest;
       });
     });
@@ -65,7 +65,7 @@
     });
     return writing.catch(function (err) {
       writing = Promise.resolve();
-      message('儲存失敗：' + errText(err), true);
+      message(S.t('儲存失敗：') + errText(err), true);
       throw err;
     });
   }
@@ -73,13 +73,13 @@
   // Supabase 的英文錯誤訊息翻成中文
   function errText(err) {
     var m = (err && err.message) || String(err);
-    if (/Invalid login credentials/i.test(m)) return 'Email 或密碼錯誤';
-    if (/already registered|already been registered/i.test(m)) return '這個 email 已經註冊過';
-    if (/Email not confirmed/i.test(m)) return '請先到信箱點確認連結';
-    if (/Password should be at least/i.test(m)) return '密碼至少需要 6 個字元';
-    if (/invalid/i.test(m) && /email/i.test(m)) return 'Email 格式不正確';
-    if (/Failed to fetch|NetworkError/i.test(m)) return '無法連線 Supabase';
-    if (/rate limit/i.test(m)) return '嘗試次數太多，請稍後再試';
+    if (/Invalid login credentials/i.test(m)) return S.t('Email 或密碼錯誤');
+    if (/already registered|already been registered/i.test(m)) return S.t('這個 email 已經註冊過');
+    if (/Email not confirmed/i.test(m)) return S.t('請先到信箱點確認連結');
+    if (/Password should be at least/i.test(m)) return S.t('密碼至少需要 6 個字元');
+    if (/invalid/i.test(m) && /email/i.test(m)) return S.t('Email 格式不正確');
+    if (/Failed to fetch|NetworkError/i.test(m)) return S.t('無法連線 Supabase');
+    if (/rate limit/i.test(m)) return S.t('嘗試次數太多，請稍後再試');
     return m;
   }
 
@@ -90,12 +90,12 @@
     bar.innerHTML =
       '<form class="login">' +
         '<input name="email" type="email" placeholder="Email" autocomplete="username" required>' +
-        '<input name="password" type="password" placeholder="密碼（至少 6 字）" autocomplete="current-password" minlength="6" required>' +
-        '<button type="submit" data-act="login">登入</button>' +
-        '<button type="submit" data-act="register">註冊</button>' +
+        S.t('<input name="password" type="password" placeholder="密碼（至少 6 字）" autocomplete="current-password" minlength="6" required>') +
+        S.t('<button type="submit" data-act="login">登入</button>') +
+        S.t('<button type="submit" data-act="register">註冊</button>') +
         '<span class="acc-msg"></span>' +
       '</form>';
-    message(msg || '訪客模式：進度只存在這台裝置，登入後可存到雲端、換裝置繼續玩', isError);
+    message(msg || S.t('訪客模式：進度只存在這台裝置，登入後可存到雲端、換裝置繼續玩'), isError);
     var form = bar.querySelector('form');
     var act = 'login';
     Array.prototype.forEach.call(form.querySelectorAll('button'), function (b) {
@@ -104,12 +104,12 @@
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var creds = { email: form.email.value.trim(), password: form.password.value };
-      message(act === 'login' ? '登入中…' : '註冊中…');
+      message(act === 'login' ? S.t('登入中…') : S.t('註冊中…'));
       var req = act === 'login' ? client.auth.signInWithPassword(creds) : client.auth.signUp(creds);
       req.then(function (r) {
         if (r.error) throw r.error;
-        if (!r.data.session) { message('註冊成功！請到信箱點確認連結後再登入'); return; }
-        setUser(r.data.session.user, act === 'register' ? '註冊成功！' : '');
+        if (!r.data.session) { message(S.t('註冊成功！請到信箱點確認連結後再登入')); return; }
+        setUser(r.data.session.user, act === 'register' ? S.t('註冊成功！') : '');
       }).catch(function (err) { message(errText(err), true); });
     });
   }
@@ -118,8 +118,8 @@
     var name = (user.email || '').split('@')[0];
     bar.innerHTML =
       '<span class="acc-user" title="' + esc(user.email || '') + '">👤 ' + esc(name) + '</span>' +
-      '<span class="acc-note">進度自動存到雲端</span>' +
-      '<button data-act="logout">登出</button>' +
+      S.t('<span class="acc-note">進度自動存到雲端</span>') +
+      S.t('<button data-act="logout">登出</button>') +
       '<span class="acc-msg"></span>';
     message(msg || '');
     bar.querySelector('[data-act=logout]').addEventListener('click', function () { client.auth.signOut(); });
@@ -140,13 +140,13 @@
 
   // ======================= 啟動 =======================
   if (!window.supabase || !cfg.url || /YOUR-/.test(cfg.url + cfg.key)) {
-    bar.innerHTML = '<span class="acc-msg">尚未設定 Supabase（js/supabase-config.js），以訪客模式遊玩，進度只存在這台裝置</span>';
+    bar.innerHTML = S.t('<span class="acc-msg">尚未設定 Supabase（js/supabase-config.js），以訪客模式遊玩，進度只存在這台裝置</span>');
     readyResolve();
     return;
   }
   client = window.supabase.createClient(cfg.url, cfg.key);
   client.auth.onAuthStateChange(function (event) {
-    if (event === 'SIGNED_OUT' && user) setUser(null, '已登出，切換為訪客模式');
+    if (event === 'SIGNED_OUT' && user) setUser(null, S.t('已登出，切換為訪客模式'));
   });
   client.auth.getSession().then(function (r) {
     var session = r.data && r.data.session;

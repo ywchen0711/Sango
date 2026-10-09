@@ -178,7 +178,8 @@
     return this.portraits[side].img;
   };
 
-  Renderer.prototype.text = function (str, x, y, size, color, align, stroke) {
+  // maxW：最大寬度，超過就壓縮字寬 (英文名字比較長)
+  Renderer.prototype.text = function (str, x, y, size, color, align, stroke, maxW) {
     var g = this.ctx;
     g.font = 'bold ' + size + 'px ' + FONT;
     g.textAlign = align || 'left';
@@ -187,10 +188,10 @@
       g.lineWidth = size / 4;
       g.strokeStyle = stroke;
       g.lineJoin = 'round';
-      g.strokeText(str, x, y);
+      if (maxW) g.strokeText(str, x, y, maxW); else g.strokeText(str, x, y);
     }
     g.fillStyle = color;
-    g.fillText(str, x, y);
+    if (maxW) g.fillText(str, x, y, maxW); else g.fillText(str, x, y);
   };
 
   // ---- 主繪製 ----
@@ -380,7 +381,7 @@
     var T = S.TILE, self = this;
     (battle.portals || []).forEach(function (p) {
       if (!battle.seen[p.y * battle.cols + p.x]) return;
-      self.text(p.exit ? '出口' : p.name, p.x * T + 8, p.y * T - 3, 6, p.exit ? '#ffffc0' : '#e0b0ff', 'center', '#000');
+      self.text(p.exit ? S.t('出口') : p.name, p.x * T + 8, p.y * T - 3, 6, p.exit ? '#ffffc0' : '#e0b0ff', 'center', '#000');
     });
   };
 
@@ -597,7 +598,7 @@
     }
     this.drawStatus(u, x, y, time);
     if (u.elite) this.text(u.name, x + 8, y - 4, 4.5, '#e0a0ff', 'center', '#000');
-    if (u.wanderer) this.text('流浪武者 ' + S.soldierFullName(u.wanderer), x + 8, y - 4, 4.5, S.QUALITIES[u.wanderer.q].color, 'center', '#000');
+    if (u.wanderer) this.text(S.t('流浪武者 ') + S.soldierFullName(u.wanderer), x + 8, y - 4, 4.5, S.QUALITIES[u.wanderer.q].color, 'center', '#000');
     if (u.id === this.highlightId) {
       g.strokeStyle = '#f8f040';
       g.lineWidth = 1;
@@ -725,7 +726,7 @@
     g.fillStyle = '#d89890';
     g.fillRect(0, y0, S.VIEW_W, 1);
 
-    var rows = [['體', 'hp'], ['騎', 'cavalry'], ['弓', 'archer'], ['步', 'spear']];
+    var rows = [[S.t('體'), 'hp'], [S.t('騎'), 'cavalry'], [S.t('弓'), 'archer'], [S.t('步'), 'spear']];
     for (var side = 0; side < 2; side++) {
       var army = battle.armies[side];
       var st = battle.stats(side);
@@ -739,10 +740,10 @@
       if (!battle.generalAlive(side)) {
         g.fillStyle = 'rgba(40,0,0,0.55)';
         g.fillRect(px, py, 24, 24);
-        this.text('敗', px + 12, py + 12, 12, '#ff5040', 'center', '#000');
+        this.text(S.t('敗'), px + 12, py + 12, 12, '#ff5040', 'center', '#000');
       }
-      this.text(army.name, px + 12, y0 + 40, 8, '#202020', 'center');
-      this.text('武' + army.war + ' 統' + army.lead, px + 12, y0 + 53, 5.5, '#604040', 'center');
+      this.text(army.name, px + 12, y0 + 40, 8, '#202020', 'center', null, 30);
+      this.text(S.t('武') + army.war + S.t(' 統') + army.lead, px + 12, y0 + 53, 5.5, '#604040', 'center');
 
       for (var i = 0; i < rows.length; i++) {
         var ry = y0 + 9 + i * 14;
@@ -761,7 +762,7 @@
     for (side = 0; side < 2; side++) {
       var gx = side === 0 ? 88 : S.VIEW_W - 88 - C.MAX * 3;
       var cmd = battle.generalAlive(side) ? battle.command[side] : 0;
-      this.text('軍令 ' + Math.floor(cmd), gx + C.MAX * 1.5, y0 + 48, 5.5, '#604040', 'center');
+      this.text(S.t('軍令 ') + Math.floor(cmd), gx + C.MAX * 1.5, y0 + 48, 5.5, '#604040', 'center');
       for (var c = 0; c < C.MAX; c++) {
         var fill = Math.max(0, Math.min(1, cmd - c));
         g.fillStyle = '#806060';
@@ -794,12 +795,12 @@
     if (this.caption) {
       this.banner(this.caption.title, this.caption.sub);
     } else if (battle.state === 'over') {
-      var title = battle.winner < 0 ? '平手' : battle.winner === 0 ? '勝利！' : '敗北…';
-      this.banner(title, (battle.timedOut ? '時間到 · ' : '') + '戰果請看下方');
+      var title = battle.winner < 0 ? S.t('平手') : battle.winner === 0 ? S.t('勝利！') : S.t('敗北…');
+      this.banner(title, (battle.timedOut ? S.t('時間到 · ') : '') + S.t('戰果請看下方'));
     } else if (!running) {
-      this.banner('暫停');
+      this.banner(S.t('暫停'));
     } else if (battle.time < 1.2) {
-      this.banner('開戰！');
+      this.banner(S.t('開戰！'));
     }
   };
 

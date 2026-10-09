@@ -12,18 +12,18 @@
   function cheb(ax, ay, bx, by) { return Math.max(Math.abs(ax - bx), Math.abs(ay - by)); }
 
   S.GENERAL_SKILLS_DEF = {
-    dash:  { name: '突進',   key: 'Shift', cd: 6, range: 4, power: 1.6, stun: 1.0, invuln: 0.45,
-             desc: '往滑鼠方向衝刺最多 4 格，途中無敵；撞到的第一個敵人受 1.6 倍傷害、被擊退並混亂 1 秒（可打斷敵將重擊）' },
-    whirl: { name: '旋風斬', key: 'F', cd: 8, power: 1.3,
-             desc: '對周圍一圈的敵人造成 1.3 倍傷害並全部擊退一格' }
+    dash:  { name: S.t('突進'),   key: 'Shift', cd: 6, range: 4, power: 1.6, stun: 1.0, invuln: 0.45,
+             desc: S.t('往滑鼠方向衝刺最多 4 格，途中無敵；撞到的第一個敵人受 1.6 倍傷害、被擊退並混亂 1 秒（可打斷敵將重擊）') },
+    whirl: { name: S.t('旋風斬'), key: 'F', cd: 8, power: 1.3,
+             desc: S.t('對周圍一圈的敵人造成 1.3 倍傷害並全部擊退一格') }
   };
   S.TELEGRAPH = 1.2;              // 敵方計策的預警時間 (秒)
   S.SLAM = { cd: [7, 10], windup: 1.0, trigger: 2, radius: 1, power: 2.2, stun: 1.0 };   // 敵將重擊
   S.BACKSTAB = 1.3;               // 背擊傷害倍率
   S.STANCES = {
-    free:   { name: '自由', key: 'C', desc: '士兵自行迎擊附近的敵人' },
-    tight:  { name: '方陣', key: 'Z', desc: '士兵緊跟主將、防禦 +20%，只迎擊靠近主將的敵人', def: 1.2, engage: 4 },
-    spread: { name: '散開', key: 'X', desc: '受到的範圍傷害減半，但攻擊 -10%', aoe: 0.5, atk: 0.9 }
+    free:   { name: S.t('自由'), key: 'C', desc: S.t('士兵自行迎擊附近的敵人') },
+    tight:  { name: S.t('方陣'), key: 'Z', desc: S.t('士兵緊跟主將、防禦 +20%，只迎擊靠近主將的敵人'), def: 1.2, engage: 4 },
+    spread: { name: S.t('散開'), key: 'X', desc: S.t('受到的範圍傷害減半，但攻擊 -10%'), aoe: 0.5, atk: 0.9 }
   };
   S.STANCE_KEYS = ['free', 'tight', 'spread'];
 
@@ -60,11 +60,11 @@
   };
   B.skillBlocked = function (side, id) {
     var g = this.generals[side];
-    if (this.state !== 'fighting') return '戰鬥已結束';
-    if (!g || g.dead) return '主將已陣亡';
-    if (g.findBuff('stun')) return '混亂中';
+    if (this.state !== 'fighting') return S.t('戰鬥已結束');
+    if (!g || g.dead) return S.t('主將已陣亡');
+    if (g.findBuff('stun')) return S.t('混亂中');
     var cd = cds(g)[id];
-    if (cd > 0) return '冷卻中 ' + Math.ceil(cd) + ' 秒';
+    if (cd > 0) return S.t('冷卻中 ') + Math.ceil(cd) + S.t(' 秒');
     return '';
   };
 
@@ -88,7 +88,7 @@
       }
       ex = nx; ey = ny;
     }
-    if (ex === g.x && ey === g.y && !hit) return '前方被擋住';
+    if (ex === g.x && ey === g.y && !hit) return S.t('前方被擋住');
     cds(g).dash = def.cd * this.cdMul(side);
     g.invulnT = def.invuln;
     if (ex !== g.x || ey !== g.y) {
@@ -107,7 +107,7 @@
       this.applyDamage(hit, this.calcDamage(g, hit, false, def.power, 0), '#fff080');
       if (!hit.dead) {
         this.addBuff(hit, { kind: 'stun', t: def.stun });
-        this.addText(hit, '混亂', '#e070ff', 0.9, -0.4);
+        this.addText(hit, S.t('混亂'), '#e070ff', 0.9, -0.4);
         this.knockback(hit, dx, dy);
       }
       this.addBurst(hit, '#fff080', 'boom');
@@ -160,7 +160,7 @@
     this.focusT[side] = 15;
     var self = this;
     this.alive(side).forEach(function (u) { if (!u.isGeneral) { u.target = target; u.retargetCd = 1.5; u.thinkCd = Math.min(u.thinkCd, self.rng() * 0.2); } });
-    this.addText(target, '集火!', '#ff5040', 1.0, -0.6);
+    this.addText(target, S.t('集火!'), '#ff5040', 1.0, -0.6);
     return true;
   };
   B.setStance = function (side, key) {
@@ -211,7 +211,7 @@
     this.pendings.push(p);
     u.thinkCd = 0.1;
     if (tgt.x !== u.x) u.facing = Math.sign(tgt.x - u.x);
-    this.addText(u, '蓄力!', '#ff4030', 1.0, -0.6);
+    this.addText(u, S.t('蓄力!'), '#ff4030', 1.0, -0.6);
     this.sound('alert', u);
     u.slamCd = S.SLAM.cd[0] + this.rng() * (S.SLAM.cd[1] - S.SLAM.cd[0]);
     return true;
@@ -220,7 +220,7 @@
     var i = this.pendings.indexOf(u.windup);
     if (i >= 0) this.pendings.splice(i, 1);
     u.windup = null;
-    if (!u.dead) { this.addText(u, '打斷!', '#80e0ff', 1.0, -0.9); this.sound('equip', u); }
+    if (!u.dead) { this.addText(u, S.t('打斷!'), '#80e0ff', 1.0, -0.9); this.sound('equip', u); }
   };
 
   B.resolvePending = function (p) {
@@ -233,12 +233,12 @@
       this.alive(1 - p.side).forEach(function (t) {
         if (cheb(t.x, t.y, p.x, p.y) > p.r || t.invulnT > 0) return;
         self.applyDamage(t, Math.round(self.calcDamage(u, t, false, S.SLAM.power, 0) * self.aoeMul(t)), '#ff6040');
-        if (!t.dead) { self.addBuff(t, { kind: 'stun', t: S.SLAM.stun }); self.addText(t, '混亂', '#e070ff', 0.9, -0.4); }
+        if (!t.dead) { self.addBuff(t, { kind: 'stun', t: S.SLAM.stun }); self.addText(t, S.t('混亂'), '#e070ff', 0.9, -0.4); }
       });
       for (var dx = -p.r; dx <= p.r; dx++) for (var dy = -p.r; dy <= p.r; dy++) {
         if (this.inBounds(p.x + dx, p.y + dy)) this.effects.push({ fx: 'burst', x: p.x + dx, y: p.y + dy, color: '#ff6040', t: 0, dur: 0.5 });
       }
-      this.addText(u, '重擊!', '#ff4030', 1.2, -0.6);
+      this.addText(u, S.t('重擊!'), '#ff4030', 1.2, -0.6);
       this.sound('boom', { x: p.x, y: p.y });
     }
   };

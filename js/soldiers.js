@@ -12,23 +12,23 @@
 
   // ---- 職業：三個兵種各三種 (沿用兵種的外觀與相剋)；mul 為能力倍率，pool 為技能池 ----
   S.CLASSES = {
-    spear:       { name: '長槍兵', type: 'spear',   price: 100, mul: {},
+    spear:       { name: S.t('長槍兵'), type: 'spear',   price: 100, mul: {},
                    pool: ['charge', 'pierce', 'sweep', 'double', 'rally', 'ironwall', 'vigor'] },
-    shield:      { name: '盾兵',   type: 'spear',   price: 120, mul: { hp: 1.2, atk: 0.75, def: 1.5, spr: 1.2 },
+    shield:      { name: S.t('盾兵'),   type: 'spear',   price: 120, mul: { hp: 1.2, atk: 0.75, def: 1.5, spr: 1.2 },
                    pool: ['sweep', 'ironwall', 'vigor', 'rally', 'heal', 'pierce'] },
-    halberd:     { name: '戟兵',   type: 'spear',   price: 130, mul: { atk: 1.25, def: 0.85, hp: 1.05 },
+    halberd:     { name: S.t('戟兵'),   type: 'spear',   price: 130, mul: { atk: 1.25, def: 0.85, hp: 1.05 },
                    pool: ['sweep', 'double', 'charge', 'pierce', 'swift', 'vigor'] },
-    archer:      { name: '弓手',   type: 'archer',  price: 120, mul: {},
+    archer:      { name: S.t('弓手'),   type: 'archer',  price: 120, mul: {},
                    pool: ['double', 'pierce', 'sharpshoot', 'swift', 'fire', 'thunder'] },
-    crossbow:    { name: '弩兵',   type: 'archer',  price: 140, mul: { atk: 1.35, hp: 0.95 }, attackMul: 1.25,
+    crossbow:    { name: S.t('弩兵'),   type: 'archer',  price: 140, mul: { atk: 1.35, hp: 0.95 }, attackMul: 1.25,
                    pool: ['pierce', 'sharpshoot', 'double', 'vigor', 'confuse', 'ironwall'] },
-    strategist:  { name: '謀士',   type: 'archer',  price: 160, mul: { atk: 0.6, int: 1.8, spr: 1.4, mp: 1.6, hp: 0.85 },
+    strategist:  { name: S.t('謀士'),   type: 'archer',  price: 160, mul: { atk: 0.6, int: 1.8, spr: 1.4, mp: 1.6, hp: 0.85 },
                    pool: ['fire', 'thunder', 'confuse', 'heal', 'rally', 'sharpshoot'] },
-    cavalry:     { name: '騎兵',   type: 'cavalry', price: 150, mul: {},
+    cavalry:     { name: S.t('騎兵'),   type: 'cavalry', price: 150, mul: {},
                    pool: ['charge', 'double', 'swift', 'sweep', 'confuse', 'vigor'] },
-    heavycav:    { name: '重騎',   type: 'cavalry', price: 190, mul: { hp: 1.25, def: 1.35, atk: 1.1 }, moveMul: 1.2,
+    heavycav:    { name: S.t('重騎'),   type: 'cavalry', price: 190, mul: { hp: 1.25, def: 1.35, atk: 1.1 }, moveMul: 1.2,
                    pool: ['charge', 'sweep', 'ironwall', 'vigor', 'pierce', 'rally'] },
-    horsearcher: { name: '弓騎',   type: 'cavalry', price: 180, mul: { atk: 0.85, hp: 0.9 }, ranged: true, range: 3,
+    horsearcher: { name: S.t('弓騎'),   type: 'cavalry', price: 180, mul: { atk: 0.85, hp: 0.9 }, ranged: true, range: 3,
                    pool: ['double', 'pierce', 'sharpshoot', 'swift', 'charge', 'fire'] }
   };
   S.CLASS_KEYS = Object.keys(S.CLASSES);
@@ -36,47 +36,47 @@
 
   // ---- 技能：主動技能沿用 S.SKILLS (config.js)；另有四個被動技能 ----
   S.PASSIVES = {
-    ironwall:   { name: '鐵壁', desc: '防禦 +3% / 級' },
-    vigor:      { name: '強健', desc: '兵力 +3% / 級' },
-    swift:      { name: '疾攻', desc: '攻擊間隔 -2% / 級' },
-    sharpshoot: { name: '神射', desc: '攻擊 +2% / 級，5 級起射程 +1' }
+    ironwall:   { name: S.t('鐵壁'), desc: S.t('防禦 +3% / 級') },
+    vigor:      { name: S.t('強健'), desc: S.t('兵力 +3% / 級') },
+    swift:      { name: S.t('疾攻'), desc: S.t('攻擊間隔 -2% / 級') },
+    sharpshoot: { name: S.t('神射'), desc: S.t('攻擊 +2% / 級，5 級起射程 +1') }
   };
   S.SKILL_MAX = 10;
   S.skillName = function (id) { return (S.SKILLS[id] || S.PASSIVES[id]).name; };
   S.skillDesc = function (id, lv) {
     if (S.PASSIVES[id]) return S.PASSIVES[id].desc;
-    return S.SKILLS[id].desc + '（威力 +' + Math.round((lv - 1) * 6) + '%）';
+    return S.SKILLS[id].desc + S.t('（威力 +') + Math.round((lv - 1) * 6) + S.t('%）');
   };
 
   // ---- 品質 (顏色沿用裝備的品質) ----
   S.SOLDIER_QUALITIES = {
-    normal: { name: '普通', mul: 1,    price: 1 },
-    magic:  { name: '魔法', mul: 1.06, price: 2 },
-    rare:   { name: '稀有', mul: 1.12, price: 4 },
-    unique: { name: '傳說', mul: 1.2,  price: 8 }
+    normal: { name: S.t('普通'), mul: 1,    price: 1 },
+    magic:  { name: S.t('魔法'), mul: 1.06, price: 2 },
+    rare:   { name: S.t('稀有'), mul: 1.12, price: 4 },
+    unique: { name: S.t('傳說'), mul: 1.2,  price: 8 }
   };
 
   // ---- 士兵的詞綴：前綴 = 能力 %、後綴 = 固定數值、中綴 = 特效 % ----
   // tiers：[稱號, 最低等級, 最小值, 最大值]
   S.SOLDIER_AFFIXES = {
     prefix: {
-      atkPct: { label: '攻擊', unit: '%', tiers: [['勇猛', 1, 5, 9], ['驍勇', 8, 10, 16], ['無畏', 18, 17, 25]] },
-      hpPct:  { label: '兵力', unit: '%', tiers: [['強壯', 1, 6, 10], ['魁梧', 8, 11, 18], ['金剛', 18, 19, 28]] },
-      defPct: { label: '防禦', unit: '%', tiers: [['堅毅', 1, 5, 9], ['剛毅', 8, 10, 16], ['不動', 18, 17, 25]] },
-      intPct: { label: '智力', unit: '%', tiers: [['聰穎', 1, 6, 10], ['博學', 8, 11, 18], ['神機', 18, 19, 28]] }
+      atkPct: { label: S.t('攻擊'), unit: '%', tiers: [[S.t('勇猛'), 1, 5, 9], [S.t('驍勇'), 8, 10, 16], [S.t('無畏'), 18, 17, 25]] },
+      hpPct:  { label: S.t('兵力'), unit: '%', tiers: [[S.t('強壯'), 1, 6, 10], [S.t('魁梧'), 8, 11, 18], [S.t('金剛'), 18, 19, 28]] },
+      defPct: { label: S.t('防禦'), unit: '%', tiers: [[S.t('堅毅'), 1, 5, 9], [S.t('剛毅'), 8, 10, 16], [S.t('不動'), 18, 17, 25]] },
+      intPct: { label: S.t('智力'), unit: '%', tiers: [[S.t('聰穎'), 1, 6, 10], [S.t('博學'), 8, 11, 18], [S.t('神機'), 18, 19, 28]] }
     },
     infix: {
-      crit:     { label: '致命一擊', unit: '%', tiers: [['狂戰', 3, 5, 9], ['戰狂', 15, 10, 15]] },
-      leech:    { label: '吸血', unit: '%', tiers: [['嗜血', 3, 3, 6], ['飲血', 15, 7, 10]] },
-      burn:     { label: '機率燃燒', unit: '%', tiers: [['烈焰', 3, 10, 20], ['業火', 15, 21, 30]] },
-      stun:     { label: '機率混亂', unit: '%', tiers: [['雷鳴', 5, 5, 9], ['天雷', 16, 10, 14]] },
-      swiftPct: { label: '攻擊速度', unit: '%', tiers: [['疾風', 3, 6, 10], ['神速', 15, 11, 18]] }
+      crit:     { label: S.t('致命一擊'), unit: '%', tiers: [[S.t('狂戰'), 3, 5, 9], [S.t('戰狂'), 15, 10, 15]] },
+      leech:    { label: S.t('吸血'), unit: '%', tiers: [[S.t('嗜血'), 3, 3, 6], [S.t('飲血'), 15, 7, 10]] },
+      burn:     { label: S.t('機率燃燒'), unit: '%', tiers: [[S.t('烈焰'), 3, 10, 20], [S.t('業火'), 15, 21, 30]] },
+      stun:     { label: S.t('機率混亂'), unit: '%', tiers: [[S.t('雷鳴'), 5, 5, 9], [S.t('天雷'), 16, 10, 14]] },
+      swiftPct: { label: S.t('攻擊速度'), unit: '%', tiers: [[S.t('疾風'), 3, 6, 10], [S.t('神速'), 15, 11, 18]] }
     },
     suffix: {
-      atk: { label: '攻擊', unit: '', tiers: [['豪力', 1, 1, 2], ['勇武', 8, 3, 4], ['霸王', 18, 5, 7]] },
-      def: { label: '防禦', unit: '', tiers: [['鐵壁', 1, 1, 2], ['金城', 8, 3, 4], ['磐石', 18, 5, 7]] },
-      hp:  { label: '兵力', unit: '', tiers: [['長命', 1, 10, 20], ['不死', 8, 21, 35], ['神魂', 18, 36, 55]] },
-      spr: { label: '精神', unit: '', tiers: [['赤心', 1, 1, 2], ['壯志', 8, 3, 4], ['英魄', 18, 5, 7]] }
+      atk: { label: S.t('攻擊'), unit: '', tiers: [[S.t('豪力'), 1, 1, 2], [S.t('勇武'), 8, 3, 4], [S.t('霸王'), 18, 5, 7]] },
+      def: { label: S.t('防禦'), unit: '', tiers: [[S.t('鐵壁'), 1, 1, 2], [S.t('金城'), 8, 3, 4], [S.t('磐石'), 18, 5, 7]] },
+      hp:  { label: S.t('兵力'), unit: '', tiers: [[S.t('長命'), 1, 10, 20], [S.t('不死'), 8, 21, 35], [S.t('神魂'), 18, 36, 55]] },
+      spr: { label: S.t('精神'), unit: '', tiers: [[S.t('赤心'), 1, 1, 2], [S.t('壯志'), 8, 3, 4], [S.t('英魄'), 18, 5, 7]] }
     }
   };
   var EPITHETS = ['破軍', '血月', '蒼狼', '赤霄', '玄武', '蒼穹', '鬼哭', '龍吟', '天狼', '斷魂', '幽冥', '狂龍', '孤星', '飛燕'];
@@ -150,16 +150,16 @@
   // ======================= 讀取士兵資訊 =======================
   S.soldierTitle = function (sol) {
     if (sol.q === 'unique') return '';
-    if (sol.q === 'rare') return '「' + sol.title + '」';
+    if (sol.q === 'rare') return S.t('「') + S.t(sol.title) + S.t('」');   // 稱號存檔是中文，顯示時翻譯
     var names = {};
     (sol.affixes || []).forEach(function (a) {
       if (!names[a.g]) names[a.g] = S.SOLDIER_AFFIXES[a.g][a.k].tiers[a.t][0];
     });
-    return ['prefix', 'infix', 'suffix'].filter(function (g) { return names[g]; }).map(function (g) { return names[g]; }).join('・');
+    return ['prefix', 'infix', 'suffix'].filter(function (g) { return names[g]; }).map(function (g) { return names[g]; }).join(S.lang === 'en' ? ' ' : '・');
   };
   S.soldierFullName = function (sol) {
     var t = S.soldierTitle(sol);
-    return (t ? t + ' ' : '') + sol.name;
+    return (t ? t + ' ' : '') + S.romanize(sol.name);   // 英文模式：名字轉拼音 (傳說士兵查字典)
   };
   S.soldierAffixLines = function (sol) {
     var lines = [];
@@ -169,13 +169,13 @@
     });
     if (sol.q === 'unique') {
       var b = S.UNIQUE_SOLDIERS[sol.uid].bonus;
-      Object.keys(b).forEach(function (k) { lines.push({ group: 'unique', name: '傳說', line: bonusLabel(k) + ' +' + b[k] + (/Pct$|crit|leech|burn|stun/.test(k) ? '%' : '') }); });
+      Object.keys(b).forEach(function (k) { lines.push({ group: 'unique', name: S.t('傳說'), line: bonusLabel(k) + ' +' + b[k] + (/Pct$|crit|leech|burn|stun/.test(k) ? '%' : '') }); });
     }
     return lines;
   };
   function bonusLabel(k) {
-    return { hpPct: '兵力', atkPct: '攻擊', defPct: '防禦', intPct: '智力', sprPct: '精神', swiftPct: '攻擊速度',
-             atk: '攻擊', def: '防禦', hp: '兵力', spr: '精神', crit: '致命一擊', leech: '吸血', burn: '機率燃燒', stun: '機率混亂' }[k] || k;
+    return { hpPct: S.t('兵力'), atkPct: S.t('攻擊'), defPct: S.t('防禦'), intPct: S.t('智力'), sprPct: S.t('精神'), swiftPct: S.t('攻擊速度'),
+             atk: S.t('攻擊'), def: S.t('防禦'), hp: S.t('兵力'), spr: S.t('精神'), crit: S.t('致命一擊'), leech: S.t('吸血'), burn: S.t('機率燃燒'), stun: S.t('機率混亂') }[k] || k;
   }
 
   // 等級提升的費用 (每個士兵各自升級；約為以前「兵種等級」的三分之一，因為以前一次升一整個兵種)
@@ -184,7 +184,7 @@
     var base = S.CLASSES[sol.cls].price * S.SOLDIER_QUALITIES[sol.q].price;
     return Math.round(base * (1 + 0.15 * sol.lv) / 10) * 10;
   };
-  S.SOLDIER_EQUIP = { weapon: '武器', helm: '頭盔', armor: '鎧甲' };   // 比照暗黑 2 的傭兵
+  S.SOLDIER_EQUIP = { weapon: S.t('武器'), helm: S.t('頭盔'), armor: S.t('鎧甲') };   // 比照暗黑 2 的傭兵
   S.SOLDIER_EQUIP_KEYS = ['weapon', 'helm', 'armor'];
 
   // ======================= 能力計算 → 戰鬥用的 preset =======================
@@ -236,7 +236,7 @@
       (sk.kind === 'magic' ? magic : phys).push(s.id);
     });
     return {
-      type: C.type, name: sol.name, lv: sol.lv, quality: sol.q,
+      type: C.type, name: S.romanize(sol.name), lv: sol.lv, quality: sol.q,
       hp: Math.round(st.hp), mp: Math.round(st.mp), atk: Math.round(st.atk), def: Math.round(st.def),
       int: Math.round(st.int), spr: Math.round(st.spr),
       physSkills: phys, magicSkills: magic, skillLv: skillLv, procs: procs,

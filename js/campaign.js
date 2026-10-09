@@ -408,9 +408,11 @@
       }).join('') : '') +
       '</div>';
   }
+  function rerollCost() { return 30 + shopLevel() * 15; }
   function renderRecruits() {
     var full = profile.soldiers.length >= BARRACKS;
-    return '<div class="box wide"><h3>徵兵處 <small>每場戰鬥後換一批' + (full ? '・營舍已滿' : '') + '</small></h3>' +
+    return '<div class="box wide"><h3>酒館 <small>招募士兵，每場戰鬥後換一批人' + (full ? '・營舍已滿' : '') + '</small>' +
+      '<button data-reroll="1" class="reroll"' + (profile.gold < rerollCost() ? ' disabled' : '') + '>🍶 換一批<small>' + rerollCost() + ' 金</small></button></h3>' +
       (profile.recruits.length ? profile.recruits.map(function (sol, i) {
         var price = S.soldierPrice(sol), st = S.soldierStats(sol);
         return '<div class="item recruit">' + soldierLabel(sol) +
@@ -418,7 +420,7 @@
           '<span class="idesc">兵 ' + st.hp + '　攻 ' + st.atk + '　防 ' + st.def + '　智 ' + st.int + '　技能：' + soldierSkillsText(sol) + '</span>' +
           '<span class="ibtns"><button data-hire="' + i + '"' + (full || profile.gold < price ? ' disabled' : '') + '>招募<small>' + price + ' 金</small></button></span>' +
           (S.soldierAffixLines(sol).length ? '<span class="iaff">' + soldierAffixText(sol) + '</span>' : '') + '</div>';
-      }).join('') : '<p class="hint">目前沒有人應徵</p>') +
+      }).join('') : '<p class="hint">今天酒館裡沒有人想從軍，下次再來吧</p>') +
       '</div>';
   }
 
@@ -522,6 +524,13 @@
     } else if (d.stage != null) {
       stageIdx = Number(d.stage);
       campMsg = '';
+    } else if (d.reroll) {
+      if (profile.gold < rerollCost()) return;
+      profile.gold -= rerollCost();
+      profile.recruits = S.rollRecruits(shopLevel(), RECRUITS);
+      campMsg = '酒館來了一批新面孔';
+      sfx('coin');
+      save();
     } else if (d.hire != null) {
       var rec = profile.recruits[Number(d.hire)], price = rec && S.soldierPrice(rec);
       if (!rec || profile.gold < price || profile.soldiers.length >= BARRACKS) return;
@@ -682,12 +691,30 @@
     fieldEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // 被收服的流浪武者加入營舍 (營舍滿了就只能讓他離開)；回傳說明 [{ sol, joined }]
+  function takeRecruits() {
+    return S.game.getRecruited().map(function (sol) {
+      if (profile.soldiers.length >= BARRACKS) return { sol: sol, joined: false };
+      sol.active = activeCount() < C.MAX_UNITS;
+      profile.soldiers.push(sol);
+      return { sol: sol, joined: true };
+    });
+  }
+  function recruitText(list) {
+    return list.map(function (r) {
+      return '<span class="sname q-' + r.sol.q + '">' + esc(S.soldierFullName(r.sol)) + '</span>（' + className(r.sol) + ' Lv' + r.sol.lv + '）' +
+        (r.joined ? (r.sol.active ? '加入並出戰' : '加入營舍') : '<span class="muted">營舍已滿，只好讓他離開</span>');
+    }).join('、');
+  }
+
   S.game.onRetreat = function () {
     S.game.stop();
     if (exploring) {              // 探索模式撤退：撿到的裝備可以帶回來
       var found = S.game.getLoot();
       found.forEach(gainItem);
-      campMsg = '已撤退' + (found.length ? '，帶回 ' + found.length + ' 件裝備' : '，這次沒有撿到裝備');
+      var joined = takeRecruits().filter(function (r) { return r.joined; });
+      campMsg = '已撤退' + (found.length ? '，帶回 ' + found.length + ' 件裝備' : '，這次沒有撿到裝備') +
+        (joined.length ? '；' + joined.map(function (r) { return S.soldierFullName(r.sol); }).join('、') + ' 加入了營舍' : '');
       save();
     } else {
       campMsg = '已撤退，這場戰鬥沒有獎勵';
@@ -730,6 +757,7 @@
     var loot = exploring ? S.game.getLoot().slice() : win ? [S.rollLoot(stageIlvl(stageIdx), playerArmy().procs.mf)].concat(S.game.getLoot()) : [];
     if (win && first) (st.drops || []).forEach(function (dr) { loot.push(S.makeItem(Object.assign({ ilvl: stageIlvl(stageIdx) }, dr))); });
     var lootNotes = loot.map(gainItem);
+    var newcomers = takeRecruits();   // 探索中收服的流浪武者
     // 結算音效：勝利 / 敗北，接著是戰利品中最好的品質
     sfx(win ? 'win' : 'lose');
     var bestQ = -1;
@@ -753,6 +781,7 @@
       (loot.length ? '<div class="loot"><b>🎁 戰利品</b>' + loot.map(function (item, i) {
         return itemLine(item, '', lootNotes[i] ? ' <small>' + lootNotes[i] + '</small>' : '');
       }).join('') + '</div>' : '') +
+      (newcomers.length ? '<p class="newcomer">🤝 ' + recruitText(newcomers) + '</p>' : '') +
       (unlock ? '<p class="unlock">' + unlock + '</p>' : '') +
       (win ? '' : '<p class="hint">回營地招募士兵、升級士兵與技能、換裝備後再挑戰吧</p>') +
       '<div class="cr-row"><button id="btn-camp" class="primary">回營地</button>' +

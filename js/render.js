@@ -475,6 +475,7 @@
     }
     this.drawStatus(u, x, y, time);
     if (u.elite) this.text(u.name, x + 8, y - 4, 4.5, '#e0a0ff', 'center', '#000');
+    if (u.wanderer) this.text('流浪武者 ' + S.soldierFullName(u.wanderer), x + 8, y - 4, 4.5, S.QUALITIES[u.wanderer.q].color, 'center', '#000');
     if (u.id === this.highlightId) {
       g.strokeStyle = '#f8f040';
       g.lineWidth = 1;

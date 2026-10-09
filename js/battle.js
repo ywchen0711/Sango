@@ -152,6 +152,7 @@
     this.ilvl = opts.ilvl || (this.explore && this.explore.ilvl) || 1;   // 精英、神壇掉落的物品等級
     this.mf = opts.mf || 0;       // 尋寶 % (裝備的中綴)：戰鬥中掉落的裝備品質更好
     this.lootFound = [];          // 這場戰鬥撿到的裝備 (精英掉落、探索的寶箱 / 敵營 / 神壇)
+    this.recruited = [];          // 被收服、願意加入的流浪武者 (soldiers.js 的士兵物件)
     this.sfx = [];                // 音效事件 { n: 名稱, x, y }，由 main.js 取出播放 (Node 模擬時沒人取，會被截斷)
     this.initEvents(opts);
     this.walls = new Array(this.cols * this.rows);
@@ -183,7 +184,9 @@
       if (c) self.addUnit(0, typeof t === 'string' ? t : t.type, c.x, c.y, mine, typeof t === 'string' ? null : t);
     });
     ex.spawns.forEach(function (sp) {
-      var u = self.addUnit(1, sp.type, sp.x, sp.y, self.armies[1]);
+      var u = sp.wanderer ? self.addUnit(1, sp.type, sp.x, sp.y, self.armies[1], S.soldierStats(sp.wanderer))
+                          : self.addUnit(1, sp.type, sp.x, sp.y, self.armies[1]);
+      if (sp.wanderer) u.wanderer = sp.wanderer;
       u.camp = sp.camp;
       u.awake = false;
       u.engaged = true;
@@ -251,6 +254,19 @@
     this.addText(last, '戰利品!', S.QUALITIES[info.q].color, 1.6, -0.6);
     this.notify('擊破敵營！獲得【' + S.QUALITIES[info.q].name + '】' + info.name, S.QUALITIES[info.q].color);
     this.sound('loot_' + info.q);
+  };
+
+  // 流浪武者被打倒：有機率被收服，戰鬥結束後加入營舍
+  Battle.prototype.tryRecruit = function (e) {
+    var sol = e.wanderer, chance = S.EXPLORE.RECRUIT_CHANCE[sol.q] || 0.3;
+    if (this.rng() < chance) {
+      this.recruited.push(sol);
+      this.addText(e, '願意加入!', '#80ff80', 2.0, -1.0);
+      this.notify(S.soldierFullName(sol) + '（' + S.CLASSES[sol.cls].name + '）被你的武勇折服，願意加入！', '#80ff80');
+      this.sound(sol.q === 'unique' ? 'loot_unique' : 'shrine', e);
+    } else {
+      this.notify(S.soldierFullName(sol) + ' 敗走了…', '#a0a0b0');
+    }
   };
 
   // 援軍：一隊陣亡的士兵帶著一半兵力回到主將身邊
@@ -945,7 +961,8 @@
       this.log.push(this.time.toFixed(1) + 's ' + army.name + '軍 ' + e.name + ' 潰滅');
     }
     if (e.elite) this.eliteOnKill(e);
-    if (this.explore && e.side === 1 && e.camp > 0) this.checkCampCleared(e.camp, e);
+    if (e.wanderer) this.tryRecruit(e);
+    else if (this.explore && e.side === 1 && e.camp > 0) this.checkCampCleared(e.camp, e);
     this.checkVictory();
   };
 

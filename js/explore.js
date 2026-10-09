@@ -23,6 +23,8 @@
     CHESTS: 14,               // 寶箱數 (其中 LOOT_CHESTS 個是裝備箱)
     LOOT_CHESTS: 5,
     SHRINES: 5,               // 神壇數 (見 elites.js)
+    WANDERERS: [2, 4],        // 流浪武者人數 (打倒後有機率加入)
+    RECRUIT_CHANCE: { magic: 0.5, rare: 0.35, unique: 0.25 },
     REWARD_MULT: 2            // 過關的金錢 / 經驗為一般出征的幾倍
   };
 
@@ -160,6 +162,23 @@
       if (shrines.some(function (c) { return cheb(c.x, c.y, q3.x, q3.y) < 18; })) continue;
       used[key(q3.x, q3.y)] = true;
       shrines.push({ x: q3.x, y: q3.y, type: kinds[shrines.length] });
+    }
+
+    // 流浪武者：獨自遊蕩的魔法 / 稀有 / 傳說士兵，各自是一座「營」(camp 1000+)，打倒後有機率加入
+    var wanderers = [], nW = ri(E.WANDERERS[0], E.WANDERERS[1]);
+    var lvBase = S.stageLevels(st, diff || 'normal').spear + 2;
+    for (tries = 0; tries < 4000 && wanderers.length < nW; tries++) {
+      var q4 = floor[Math.floor(rng() * floor.length)];
+      if (used[key(q4.x, q4.y)] || cheb(q4.x, q4.y, start.x, start.y) < 18 || cheb(q4.x, q4.y, boss.x, boss.y) < 14) continue;
+      if (centers.some(function (c) { return cheb(c.x, c.y, q4.x, q4.y) < 8; })) continue;
+      if (wanderers.some(function (c) { return cheb(c.x, c.y, q4.x, q4.y) < 15; })) continue;
+      used[key(q4.x, q4.y)] = true;
+      var uniques = Object.keys(S.UNIQUE_SOLDIERS).filter(function (id) { return S.UNIQUE_SOLDIERS[id].ilvl <= stageIdx + 1 + D.ilvl; });
+      var r = rng(), sol;
+      if (uniques.length && r < 0.08) sol = S.makeSoldier({ unique: uniques[Math.floor(rng() * uniques.length)], ilvl: stageIdx + 1 + D.ilvl, lv: lvBase });
+      else sol = S.makeSoldier({ q: r < 0.6 ? 'magic' : 'rare', ilvl: stageIdx + 1 + D.ilvl, lv: lvBase });
+      wanderers.push({ x: q4.x, y: q4.y, soldier: sol });
+      spawns.push({ type: S.CLASSES[sol.cls].type, x: q4.x, y: q4.y, camp: 1000 + wanderers.length, wanderer: sol });
     }
 
     // 我軍起點

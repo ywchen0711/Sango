@@ -225,6 +225,7 @@
 
   // ---- 單位數值表 ----
   function skillCell(ids) {
+    if (!ids.length) return '<td class="skill">—</td>';   // 士兵角色可能沒有物理或魔法技能 (四個技能都是另一類或被動)
     return '<td class="skill ' + S.SKILLS[ids[0]].kind + '">' + ids.map(function (id) {
       var sk = S.SKILLS[id];
       return '<span title="' + sk.desc + '（MP ' + sk.mp + '）">' + sk.name + '</span>';
@@ -525,6 +526,7 @@
     // 探索模式途中撿到的裝備
     getLoot: function () { return (battle && battle.lootFound) || []; },
     getExpBonus: function () { return (battle && battle.expBonus) || 0; },   // 經驗壇
+    getRecruited: function () { return (battle && battle.recruited) || []; },   // 被收服的流浪武者
     isExplore: function () { return !!explore; },
     // 正式開戰
     start: function () {

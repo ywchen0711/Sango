@@ -1,29 +1,74 @@
 /*
- * 帳號登入、存檔、經驗值與升級（資料存在 Supabase，設定見 js/supabase-config.js）
- *
- * Supabase 的 saves 表每位玩家一列，data 欄位內容：
- *   armies / settings：按「存檔」時的編成與設定（讀檔時套用）
- *   stats / exp / levels：戰績、經驗值、等級（有變化就自動儲存）
+ * 帳號登入與進度儲存
+ *   登入：進度存在 Supabase 的 saves 表 (設定見 js/supabase-config.js)
+ *   未登入：以訪客身分遊玩，進度存在這台裝置的瀏覽器 (localStorage)
+ * 給 js/campaign.js 用的介面：S.store.ready / load() / save(profile)，登入狀態改變時呼叫 S.store.onChange()
  */
 (function (S) {
   'use strict';
 
   var bar = document.getElementById('account');
   var cfg = window.SANGO_SUPABASE || {};
-  var LEVEL_NAMES = { general: '主將', spear: '槍兵', archer: '弓兵', cavalry: '騎兵' };
+  var GUEST_KEY = 'sango-guest-profile';
+  var VERSION = 2;                // 進度格式版本 (舊版的自由對戰存檔不相容)
 
   var client = null, user = null;
-  var loadout = null;             // { armies, settings } 最後一次手動存檔的內容
-  var profile = null;             // { stats, exp, levels }
   var writing = Promise.resolve();
+  var readyResolve;
 
-  function newProfile() {
-    var levels = {};
-    S.LEVEL_KEYS.forEach(function (k) { levels[k] = 0; });
-    return { stats: { wins: 0, losses: 0, draws: 0, watched: 0 }, exp: 0, levels: levels };
+  var store = S.store = {
+    ready: new Promise(function (r) { readyResolve = r; }),
+    onChange: null,
+    isCloud: function () { return !!user; },
+    load: function () { return user ? loadCloud() : Promise.resolve(loadGuest()); },
+    save: function (profile) {
+      if (profile) profile.version = VERSION;
+      return user ? saveCloud(profile) : Promise.resolve(saveGuest(profile));
+    }
+  };
+
+  function valid(p) { return p && p.version === VERSION && p.general ? p : null; }
+
+  // ======================= 訪客 (localStorage) =======================
+  function loadGuest() {
+    try { return valid(JSON.parse(localStorage.getItem(GUEST_KEY))); } catch (e) { return null; }
+  }
+  function saveGuest(profile) {
+    try {
+      if (profile) localStorage.setItem(GUEST_KEY, JSON.stringify(profile));
+      else localStorage.removeItem(GUEST_KEY);
+    } catch (e) { message('瀏覽器無法儲存進度', true); }
   }
 
-  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+  // ======================= Supabase =======================
+  function loadCloud() {
+    return client.from('saves').select('data').eq('user_id', user.id).maybeSingle().then(function (r) {
+      if (r.error) throw r.error;
+      var p = valid(r.data && r.data.data);
+      if (p) return p;
+      // 帳號裡還沒有進度：把這台裝置的訪客進度帶進來
+      var guest = loadGuest();
+      if (!guest) return null;
+      return saveCloud(guest).then(function () {
+        saveGuest(null);
+        message('已把訪客進度存到帳號');
+        return guest;
+      });
+    });
+  }
+
+  function saveCloud(profile) {
+    var row = { user_id: user.id, data: profile || {}, updated_at: new Date().toISOString() };
+    // 依序寫入，避免兩次寫入互相覆蓋
+    writing = writing.then(function () {
+      return client.from('saves').upsert(row).then(function (r) { if (r.error) throw r.error; });
+    });
+    return writing.catch(function (err) {
+      writing = Promise.resolve();
+      message('儲存失敗：' + errText(err), true);
+      throw err;
+    });
+  }
 
   // Supabase 的英文錯誤訊息翻成中文
   function errText(err) {
@@ -38,6 +83,8 @@
     return m;
   }
 
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+
   // ======================= 畫面 =======================
   function renderLoggedOut(msg, isError) {
     bar.innerHTML =
@@ -48,7 +95,7 @@
         '<button type="submit" data-act="register">註冊</button>' +
         '<span class="acc-msg"></span>' +
       '</form>';
-    message(msg || '登入後可以存檔，戰鬥還能獲得經驗值升級部隊', isError);
+    message(msg || '訪客模式：進度只存在這台裝置，登入後可存到雲端、換裝置繼續玩', isError);
     var form = bar.querySelector('form');
     var act = 'login';
     Array.prototype.forEach.call(form.querySelectorAll('button'), function (b) {
@@ -62,43 +109,20 @@
       req.then(function (r) {
         if (r.error) throw r.error;
         if (!r.data.session) { message('註冊成功！請到信箱點確認連結後再登入'); return; }
-        onSignedIn(r.data.session.user, act === 'register');
+        setUser(r.data.session.user, act === 'register' ? '註冊成功！' : '');
       }).catch(function (err) { message(errText(err), true); });
     });
   }
 
-  function renderLoggedIn(msg, isError) {
-    var st = profile.stats, cost = S.LEVEL.COST;
+  function renderLoggedIn(msg) {
     var name = (user.email || '').split('@')[0];
     bar.innerHTML =
-      '<div class="acc-row">' +
-        '<span class="acc-user" title="' + esc(user.email || '') + '">👤 ' + esc(name) + '</span>' +
-        '<span class="acc-stats">戰績 ' + st.wins + '勝 ' + st.losses + '敗 ' + st.draws + '和' +
-          (st.watched ? '　觀戰 ' + st.watched : '') + '</span>' +
-        '<button data-act="save">💾 存檔</button>' +
-        '<button data-act="load">📂 讀檔</button>' +
-        '<button data-act="logout">登出</button>' +
-      '</div>' +
-      '<div class="acc-row levels">' +
-        '<span class="acc-exp" title="勝 +' + S.EXP.win + '、和 +' + S.EXP.draw + '、敗 +' + S.EXP.loss + '（觀戰不加）">' +
-          '經驗值 <b>' + profile.exp + '</b></span>' +
-        S.LEVEL_KEYS.map(function (k) {
-          var lv = profile.levels[k] || 0;
-          var max = lv >= S.LEVEL.MAX;
-          return '<button class="lvup" data-lv="' + k + '"' + (max || profile.exp < cost ? ' disabled' : '') +
-            ' title="' + (max ? '已達最高等級' : '花 ' + cost + ' 經驗值升到 Lv' + (lv + 1) +
-            '（能力 +' + Math.round((lv + 1) * S.LEVEL.BONUS * 100) + '%）') + '">' +
-            LEVEL_NAMES[k] + ' Lv' + lv + (max ? '' : ' ▲') + '</button>';
-        }).join('') +
-        '<span class="acc-msg"></span>' +
-      '</div>';
-    message(msg || '', isError);
-    bar.querySelector('[data-act=save]').addEventListener('click', saveLoadout);
-    bar.querySelector('[data-act=load]').addEventListener('click', function () { applyLoadout(true); });
+      '<span class="acc-user" title="' + esc(user.email || '') + '">👤 ' + esc(name) + '</span>' +
+      '<span class="acc-note">進度自動存到雲端</span>' +
+      '<button data-act="logout">登出</button>' +
+      '<span class="acc-msg"></span>';
+    message(msg || '');
     bar.querySelector('[data-act=logout]').addEventListener('click', function () { client.auth.signOut(); });
-    Array.prototype.forEach.call(bar.querySelectorAll('[data-lv]'), function (b) {
-      b.addEventListener('click', function () { levelUp(b.dataset.lv); });
-    });
   }
 
   function message(text, isError) {
@@ -108,96 +132,25 @@
     el.classList.toggle('error', !!isError);
   }
 
-  // ======================= 資料庫 =======================
-  function writeRow() {
-    var data = Object.assign({}, loadout || {}, profile);
-    var row = { user_id: user.id, data: data, updated_at: new Date().toISOString() };
-    // 依序寫入，避免兩次寫入互相覆蓋
-    writing = writing.then(function () {
-      return client.from('saves').upsert(row).then(function (r) { if (r.error) throw r.error; });
-    });
-    return writing.catch(function (err) {
-      writing = Promise.resolve();
-      message('儲存失敗：' + errText(err), true);
-      throw err;
-    });
-  }
-
-  function onSignedIn(u, isNew) {
+  function setUser(u, msg) {
     user = u;
-    message('讀取存檔中…');
-    client.from('saves').select('data, updated_at').eq('user_id', u.id).maybeSingle().then(function (r) {
-      if (r.error) throw r.error;
-      var d = r.data && r.data.data;
-      profile = newProfile();
-      loadout = null;
-      if (d) {
-        Object.assign(profile.stats, d.stats);
-        profile.exp = Number(d.exp) || 0;
-        Object.assign(profile.levels, d.levels);
-        if (d.armies) loadout = { armies: d.armies, settings: d.settings, savedAt: r.data.updated_at };
-      }
-      S.game.setLevels(profile.levels);
-      if (loadout) applyLoadout(false);
-      else renderLoggedIn(isNew ? '註冊成功！打完一場就能獲得經驗值' : '歡迎！目前還沒有存檔');
-    }).catch(function (err) {
-      profile = null;
-      renderLoggedOut('讀取存檔失敗：' + errText(err), true);
-    });
+    if (u) renderLoggedIn(msg); else renderLoggedOut(msg);
+    if (store.onChange) store.onChange();
   }
-
-  function saveLoadout() {
-    var st = S.game.getState();
-    loadout = { armies: st.armies, settings: st.settings };
-    writeRow().then(function () { renderLoggedIn('已存檔 ' + new Date().toLocaleTimeString()); }, function () {});
-  }
-
-  function applyLoadout(manual) {
-    if (!loadout) { renderLoggedIn('沒有存檔', manual); return; }
-    S.game.applyState(loadout);
-    renderLoggedIn('已讀取' + (loadout.savedAt ? ' ' + new Date(loadout.savedAt).toLocaleString() + ' 的' : '') + '存檔');
-  }
-
-  function levelUp(key) {
-    var lv = profile.levels[key] || 0;
-    if (profile.exp < S.LEVEL.COST || lv >= S.LEVEL.MAX) return;
-    profile.exp -= S.LEVEL.COST;
-    profile.levels[key] = lv + 1;
-    var applied = S.game.setLevels(profile.levels);
-    renderLoggedIn(LEVEL_NAMES[key] + ' 升到 Lv' + (lv + 1) + '！' + (applied ? '' : '下一場戰鬥生效'));
-    writeRow().catch(function () {});
-  }
-
-  // 戰鬥結束 → 記錄戰績、獲得經驗值
-  S.onBattleOver = function (winner, humanSide) {
-    if (!user || !profile) return;
-    var gain = 0, st = profile.stats;
-    if (humanSide < 0) st.watched++;
-    else if (winner < 0) { st.draws++; gain = S.EXP.draw; }
-    else if (winner === humanSide) { st.wins++; gain = S.EXP.win; }
-    else { st.losses++; gain = S.EXP.loss; }
-    profile.exp += gain;
-    renderLoggedIn(humanSide < 0 ? '觀戰不會獲得經驗值' :
-      (winner === humanSide ? '勝利！' : winner < 0 ? '平手。' : '敗北…') + '經驗值 +' + gain);
-    writeRow().catch(function () {});
-  };
 
   // ======================= 啟動 =======================
   if (!window.supabase || !cfg.url || /YOUR-/.test(cfg.url + cfg.key)) {
-    bar.innerHTML = '<span class="acc-msg">尚未設定 Supabase（js/supabase-config.js），目前無法登入與存檔</span>';
+    bar.innerHTML = '<span class="acc-msg">尚未設定 Supabase（js/supabase-config.js），以訪客模式遊玩，進度只存在這台裝置</span>';
+    readyResolve();
     return;
   }
   client = window.supabase.createClient(cfg.url, cfg.key);
   client.auth.onAuthStateChange(function (event) {
-    if (event === 'SIGNED_OUT') {
-      user = profile = loadout = null;
-      S.game.setLevels(null);
-      renderLoggedOut('已登出');
-    }
+    if (event === 'SIGNED_OUT' && user) setUser(null, '已登出，切換為訪客模式');
   });
   client.auth.getSession().then(function (r) {
     var session = r.data && r.data.session;
-    if (session) { bar.innerHTML = '<span class="acc-msg"></span>'; onSignedIn(session.user, false); }
-    else renderLoggedOut();
-  });
+    user = session ? session.user : null;
+    if (user) renderLoggedIn(); else renderLoggedOut();
+  }, function () { renderLoggedOut(); }).then(readyResolve);
 })(window.Sango);

@@ -25,7 +25,10 @@
 
   B.initEvents = function (opts) {
     this.control = (opts.control || [false, false]).slice();   // true = 玩家操控該方
-    this.command = [S.COMMAND.START, S.COMMAND.START];
+    var armies = this.armies;   // 裝備可增加開戰軍令 (army.commandBonus)
+    this.command = [0, 1].map(function (side) {
+      return Math.min(S.COMMAND.MAX, S.COMMAND.START + (armies[side].commandBonus || 0));
+    });
     this.tacticCd = [{}, {}];
     this.globalCd = [0, 0];
     this.chests = [];
@@ -39,31 +42,54 @@
     this.notices = [];            // 畫面上方的事件通知 { text, color, t, dur }
     this.tacticUses = {};
     this.chestOpens = {};
+    this.initSkills();            // 主將技能、集火、陣型、預警攻擊 (skills.js)
   };
 
   B.updateEvents = function (dt) {
     var C = S.COMMAND;
+    this.updateSkills(dt);
     for (var side = 0; side < 2; side++) {
       if (this.generalAlive(side)) this.gainCommand(side, C.REGEN * dt);
       this.globalCd[side] -= dt;
       var cds = this.tacticCd[side];
       for (var k in cds) cds[k] -= dt;
-      if (!this.isHuman(side)) {
+      if (!this.isHuman(side) || this.autoTactics[side]) {   // 玩家方可開「自動計策」交給電腦判斷
         this.aiT[side] -= dt;
         if (this.aiT[side] <= 0) { this.aiT[side] = 0.6 + this.rng() * 0.8; this.aiTactics(side); }
       }
     }
 
-    this.chestT -= dt;
-    if (this.chestT <= 0) { this.chestT = between(this.rng, S.CHEST.INTERVAL); this.spawnChest(); }
     this.chestAiT -= dt;
     if (this.chestAiT <= 0) { this.chestAiT = 0.5; this.assignChests(); }
 
     this.weatherT -= dt;
     if (this.weatherT <= 0) { this.weatherT = between(this.rng, S.WEATHER_CHANGE); this.changeWeather(); }
 
+    if (this.explore) { this.updateExplore(dt); return; }   // 探索：寶箱事先擺好、沒有伏兵
+
+    this.chestT -= dt;
+    if (this.chestT <= 0) { this.chestT = between(this.rng, S.CHEST.INTERVAL); this.spawnChest(); }
+
     if (!this.ambushDone && this.time >= S.AMBUSH.AFTER && this.rng() < S.AMBUSH.CHANCE * dt) this.ambush();
   };
+
+  // 探索模式：視野、非戰鬥回復
+  B.updateExplore = function (dt) {
+    var E = S.EXPLORE, self = this;
+    this.visionT = (this.visionT || 0) - dt;
+    if (this.visionT <= 0) { this.visionT = 0.2; this.updateVision(); }
+    this.regenT = (this.regenT || 0) - dt;
+    if (this.regenT > 0) return;
+    this.regenT = 0.5;
+    this.alive(0).forEach(function (u) {
+      var danger = self.unitsNear(1, u.x, u.y, E.REGEN_SAFE).some(function (e) { return e.awake; });
+      if (danger || u.hp >= u.maxHp) return;
+      u.hp = Math.min(u.maxHp, u.hp + u.maxHp * E.REGEN * 0.5);
+      u.mp = Math.min(u.maxMp, u.mp + u.maxMp * E.REGEN * 0.5);
+    });
+  };
+
+  B.rollChestItem = function () { return weighted(this.rng, S.CHEST_ITEMS); };
 
   B.notify = function (text, color) {
     this.notices.push({ text: text, color: color || '#ffffff', t: 0, dur: 2.5 });
@@ -113,28 +139,10 @@
     if (tc.target) {
       var targets = this.tacticTargets(side, id, tx, ty);
       if (!targets.length) return false;
-      var power = tc.power * (tc.element === 'fire' ? this.fireMul() : 1);
-      var ti = S.TACTIC_INT.base + army.int * S.TACTIC_INT.ratio;
-      var caster = { side: side, isGeneral: true, stat: function () { return ti; } };
-      if (tc.radius > 0) {
-        for (var dx = -tc.radius; dx <= tc.radius; dx++) {
-          for (var dy = -tc.radius; dy <= tc.radius; dy++) {
-            if (this.inBounds(tx + dx, ty + dy)) {
-              this.effects.push({ fx: 'burst', x: tx + dx, y: ty + dy, color: tc.color, t: 0, dur: 0.6 });
-            }
-          }
-        }
-      }
-      targets.forEach(function (t) {
-        self.applyDamage(t, self.calcDamage(caster, t, true, power, 0), '#e0b0ff');
-        if (t.dead) return;
-        if (tc.burn) self.applyBurn(caster, t, tc.burn);
-        if (tc.stun) {
-          self.addBuff(t, { kind: 'stun', t: tc.stun });
-          self.addText(t, '混亂', '#e070ff', 0.9, -0.4);
-        }
-        if (tc.fx) self.addBurst(t, tc.color, tc.fx);
-      });
+      if (tc.radius === 0) { tx = targets[0].x; ty = targets[0].y; }   // 落雷吸附到目標所在的格子
+      // 敵方的計策先出現預警範圍才落下 (玩家可以躲)；玩家的計策立即生效
+      if (side === 1) this.telegraphTactic(side, id, tx, ty);
+      else this.applyTargetTactic(side, id, tx, ty);
     } else if (tc.buff) {
       var b = tc.buff;
       var mul = b.mul + army[b.from] / b.scale;
@@ -149,9 +157,39 @@
     this.tacticCd[side][id] = tc.cd;
     this.globalCd[side] = S.COMMAND.GLOBAL_CD;
     this.tacticUses[tc.name] = (this.tacticUses[tc.name] || 0) + 1;
+    this.sound(tc.target && side === 1 ? 'alert' : 'tac_' + id, tx != null ? { x: tx, y: ty } : g);
     this.addText(g, tc.name + '!', tc.color, 1.4, -0.6);
     this.notify(army.name + ' 施展「' + tc.name + '」', tc.color);
     return true;
+  };
+
+  // 目標型計策的結算 (玩家立即、敵方在預警結束時)：範圍內的敵人受到魔法傷害與附加狀態
+  B.applyTargetTactic = function (side, id, tx, ty) {
+    var tc = S.TACTICS[id], army = this.armies[side], self = this;
+    var targets = tc.radius > 0 ? this.tacticTargets(side, id, tx, ty) :
+      this.alive(1 - side).filter(function (e) { return e.x === tx && e.y === ty; });
+    var power = tc.power * (tc.element === 'fire' ? this.fireMul() : 1);
+    var ti = S.TACTIC_INT.base + army.int * S.TACTIC_INT.ratio;
+    var caster = { side: side, isGeneral: true, stat: function () { return ti; } };
+    for (var dx = -tc.radius; dx <= tc.radius; dx++) {
+      for (var dy = -tc.radius; dy <= tc.radius; dy++) {
+        if (this.inBounds(tx + dx, ty + dy)) this.effects.push({ fx: 'burst', x: tx + dx, y: ty + dy, color: tc.color, t: 0, dur: 0.6 });
+      }
+    }
+    if (tc.fx === 'bolt') this.effects.push({ fx: 'bolt', x: tx, y: ty, color: tc.color, t: 0, dur: 0.3 });
+    targets.forEach(function (t) {
+      if (t.invulnT > 0) return;
+      var dmg = self.calcDamage(caster, t, true, power, 0) * (tc.radius > 0 ? self.aoeMul(t) : 1);
+      self.applyDamage(t, Math.max(1, Math.round(dmg)), '#e0b0ff');
+      if (t.dead) return;
+      if (tc.burn) self.applyBurn(caster, t, tc.burn);
+      if (tc.stun) {
+        self.addBuff(t, { kind: 'stun', t: tc.stun });
+        self.addText(t, '混亂', '#e070ff', 0.9, -0.4);
+      }
+      if (tc.fx) self.addBurst(t, tc.color, tc.fx);
+    });
+    if (side === 1) this.sound('tac_' + id, { x: tx, y: ty });
   };
 
   // 主將出陣 / 待機 (待機時退回布陣位置，只反擊射程內的敵人)
@@ -159,9 +197,95 @@
     var g = this.generals[side];
     if (!g || g.dead || this.state !== 'fighting' || g.engaged === engage) return false;
     g.engaged = engage;
+    g.held = !engage;             // 玩家下令待命：不會自行出陣
     g.target = null;
+    g.order = null;
     this.addText(g, engage ? '出陣!' : '撤退!', engage ? '#f8d838' : '#80c0ff', 1.0);
     return true;
+  };
+
+  // ---- WASD 直接操控主將：按住方向鍵一格一格走，放開後原地固守 ----
+  B.setWalk = function (side, dx, dy) {
+    var g = this.generals[side];
+    if (!g || g.dead || this.state !== 'fighting') return;
+    if (dx || dy) {
+      g.order = { kind: 'walk', dx: dx, dy: dy };
+      g.engaged = true;
+      g.held = false;
+      g.target = null;
+      if (!g.isMoving()) g.thinkCd = 0;
+    } else if (g.order && g.order.kind === 'walk') {
+      g.order = { kind: 'hold' };
+    }
+  };
+
+  // 朝 (dx, dy) 走一步；斜向被擋住時沿著牆滑動
+  B.walkStep = function (u, dx, dy) {
+    var tries = [[dx, dy]];
+    if (dx && dy) tries.push([dx, 0], [0, dy]);
+    for (var i = 0; i < tries.length; i++) {
+      var tx = u.x + tries[i][0], ty = u.y + tries[i][1];
+      if (this.canStep(u.x, u.y, tries[i][0], tries[i][1], u, false) ||
+          (this.canSwap(u, tx, ty) && this.canStep(u.x, u.y, tries[i][0], tries[i][1], u, true))) {
+        this.moveTo(u, tx, ty);
+        return;
+      }
+    }
+    if (dx) u.facing = dx;
+    u.thinkCd = 0.05;
+  };
+
+  // ---- 手動操控主將 ----
+  // order：{ kind: 'move', x, y } 走到指定格 (途中不停下交戰)
+  //        { kind: 'attack', target } 追擊指定敵人
+  //        { kind: 'hold' } 原地固守，只打射程內的敵人 (抵達目的地 / 目標被擊破後自動轉為固守)
+  B.commandGeneral = function (side, order) {
+    var g = this.generals[side];
+    if (!g || g.dead || this.state !== 'fighting') return false;
+    if (order.kind === 'move' && (this.isWall(order.x, order.y) || (g.x === order.x && g.y === order.y))) return false;
+    if (order.kind === 'attack' && (!order.target || order.target.dead || order.target.side === side)) return false;
+    g.order = order;
+    g.engaged = true;
+    g.target = order.kind === 'attack' ? order.target : null;
+    g.thinkCd = 0;
+    return true;
+  };
+
+  B.followOrder = function (u, enemies) {
+    var o = u.order;
+    if (o.kind === 'walk') { this.walkStep(u, o.dx, o.dy); return; }
+    // 探索模式：主將跑太前面就先等部隊 (射程內有敵人照常攻擊)
+    if (this.explore && o.kind !== 'hold' && this.armyLagging(u)) {
+      if (!this.tryAttack(u, enemies)) u.thinkCd = 0.2;
+      return;
+    }
+    if (o.kind === 'attack') {
+      var t = o.target;
+      if (t.dead) { u.order = { kind: 'hold' }; u.thinkCd = 0.1; return; }
+      u.target = t;
+      if (this.inRangeAt(u, u.x, u.y, t)) {
+        if (t.x !== u.x) u.facing = t.x > u.x ? 1 : -1;
+        if (u.atkCd <= 0) this.attack(u, t);
+        u.thinkCd = 0.05;
+        return;
+      }
+      var step = this.pathStep(u, t);
+      if (step) this.moveTo(u, step.x, step.y);
+      else u.thinkCd = 0.2;
+      return;
+    }
+    if (o.kind === 'move') {
+      var arrived = u.x === o.x && u.y === o.y ||
+        (!this.isFree(o.x, o.y, u) && Math.max(Math.abs(u.x - o.x), Math.abs(u.y - o.y)) <= 1);   // 目的地被佔住，就停在旁邊
+      if (arrived) {
+        u.order = { kind: 'hold' };
+      } else {
+        if (!this.stepToward(u, o)) u.thinkCd = 0.2;
+        return;
+      }
+    }
+    // 固守
+    if (!this.tryAttack(u, enemies)) u.thinkCd = 0.2;
   };
 
   // ---- 電腦方 AI：依戰況決定施放計策 ----
@@ -169,6 +293,13 @@
     if (!this.generalAlive(side) || this.globalCd[side] > 0) return;
     var self = this, rng = this.rng;
     var enemies = this.alive(1 - side), allies = this.alive(side);
+    if (this.explore) {
+      var g = this.generals[side];
+      if (side === 1 && !this.bossAwake) return;
+      enemies = this.unitsNear(1 - side, g.x, g.y, 12).filter(function (e) { return e.awake; });
+      allies = this.unitsNear(side, g.x, g.y, 12);
+      if (!allies.length) return;
+    }
     if (!enemies.length) return;
     var pts = this.command[side];
     function ready(id) { return !self.tacticBlocked(side, id) && rng() < 0.6; }
@@ -213,8 +344,8 @@
   B.spawnChest = function () {
     if (this.chests.length >= S.CHEST.MAX) return;
     var free = [];
-    for (var x = 4; x < S.COLS - 4; x++) {
-      for (var y = 0; y < S.ROWS; y++) {
+    for (var x = 4; x < this.cols - 4; x++) {
+      for (var y = 0; y < this.rows; y++) {
         if (this.isFree(x, y, null) && !this.chestAt(x, y)) free.push({ x: x, y: y });
       }
     }
@@ -229,13 +360,23 @@
     this.chests.splice(this.chests.indexOf(chest), 1);
     chest.open = false;
     this.units.forEach(function (o) { if (o.chestGoal === chest) { o.chestGoal = null; o.chestForced = false; } });
-    var it = S.CHEST_ITEMS[chest.item];
     var army = this.armies[u.side];
     var self = this;
+    if (chest.loot) {               // 探索模式的裝備箱
+      var item = S.rollLoot(this.explore.ilvl, this.mf), info = S.itemInfo(item), color = S.QUALITIES[info.q].color;
+      if (u.side === 0) this.lootFound.push(item);
+      this.addText(u, info.name, color, 1.6, -0.6);
+      this.addBurst(u, color);
+      this.notify(u.name + ' 打開裝備箱：【' + S.QUALITIES[info.q].name + '】' + info.name, color);
+      this.sound('loot_' + info.q, u);
+      return;
+    }
+    var it = S.CHEST_ITEMS[chest.item];
     this.chestOpens[it.name] = (this.chestOpens[it.name] || 0) + 1;
     this.addText(u, it.name, it.color, 1.4, -0.6);
     this.addBurst(u, it.color);
     this.notify(army.name + '軍 ' + u.name + ' 開啟寶箱：' + it.name + (chest.item === 'trap' ? '！' : ''), it.color);
+    this.sound(chest.item === 'trap' ? 'boom' : 'chest', u);
 
     if (it.heal) this.heal(u, u.maxHp * it.heal);
     if (it.healAll) this.alive(u.side).forEach(function (a) { self.heal(a, a.maxHp * it.healAll); });
@@ -257,7 +398,7 @@
 
   // 可以去撿寶箱的部隊 (主將不會自行離開)，依實際路徑距離由近到遠
   B.chestSeekers = function (side, chest) {
-    var field = this.distanceField(chest.x, chest.y);
+    var field = this.distanceField(chest.x, chest.y, this.explore ? 24 : null);
     var self = this;
     return this.alive(side).filter(function (u) { return !u.isGeneral; })
       .map(function (u) { return { u: u, d: field[self.idx(u.x, u.y)] }; })
@@ -267,9 +408,10 @@
 
   // 自動派兵：附近沒在交戰的士兵會去撿；電腦方會派較遠的士兵
   B.assignChests = function () {
-    var self = this;
+    var self = this, g0 = this.generals[0];
     this.chests.forEach(function (chest) {
-      for (var side = 0; side < 2; side++) {
+      if (self.explore && (!g0 || g0.dead || cheb(chest.x, chest.y, g0.x, g0.y) > 10)) return;
+      for (var side = 0; side < (self.explore ? 1 : 2); side++) {
         var taken = self.units.some(function (u) { return !u.dead && u.side === side && u.chestGoal === chest; });
         if (taken) continue;
         var maxD = self.isHuman(side) ? S.CHEST.AUTO_DIST : S.CHEST.AI_DIST;
@@ -329,8 +471,8 @@
     var loser = power[0] < power[1] ? 0 : power[1] < power[0] ? 1 : (this.rng() * 2) | 0;
     var side = this.rng() < S.AMBUSH.LOSER_BIAS ? loser : 1 - loser;
     var free = [];
-    for (var x = 4; x < S.COLS - 4; x++) {
-      [0, S.ROWS - 1].forEach(function (y) {
+    for (var x = 4; x < this.cols - 4; x++) {
+      [0, this.rows - 1].forEach(function (y) {
         if (this.isFree(x, y, null) && !this.chestAt(x, y)) free.push({ x: x, y: y });
       }, this);
     }
@@ -342,5 +484,6 @@
     this.addText(u, '伏兵!', '#f8d838', 1.6, -0.6);
     this.addBurst(u, '#f8d838');
     this.notify(this.armies[side].name + '軍 伏兵' + S.UNIT_TYPES[type].name + '殺出！', '#f8d838');
+    this.sound('alert');
   };
 })(window.Sango);

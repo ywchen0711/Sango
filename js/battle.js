@@ -141,6 +141,7 @@
     this.rows = this.map.length;
     this.timeLimit = this.explore ? Infinity : S.TIME_LIMIT;
     this.ilvl = opts.ilvl || (this.explore && this.explore.ilvl) || 1;   // 精英、神壇掉落的物品等級
+    this.mf = opts.mf || 0;       // 尋寶 % (裝備的中綴)：戰鬥中掉落的裝備品質更好
     this.lootFound = [];          // 這場戰鬥撿到的裝備 (精英掉落、探索的寶箱 / 敵營 / 神壇)
     this.sfx = [];                // 音效事件 { n: 名稱, x, y }，由 main.js 取出播放 (Node 模擬時沒人取，會被截斷)
     this.initEvents(opts);
@@ -235,7 +236,7 @@
     if (this.campLeft[camp] > 0) return;
     this.campsCleared++;
     this.reinforce();
-    var item = S.rollLoot(this.explore.ilvl);
+    var item = S.rollLoot(this.explore.ilvl, this.mf);
     this.lootFound.push(item);
     var info = S.itemInfo(item);
     this.addText(last, '戰利品!', S.QUALITIES[info.q].color, 1.6, -0.6);
@@ -703,7 +704,7 @@
     if (nx !== u.x) u.facing = sign(nx - u.x);
     u.x = nx; u.y = ny;
     u.moveT = 0;
-    u.moveDur = u.moveTime * (diag ? 1.3 : 1);
+    u.moveDur = u.moveTime * (diag ? 1.3 : 1) * (u.findBuff('slow') ? 1.5 : 1);   // 緩速
     u.charged = u.type === 'cavalry';
     u.thinkCd = 0;
   };
@@ -714,7 +715,7 @@
   var MAGIC_COLOR = '#c080ff';
 
   Battle.prototype.attack = function (u, e) {
-    u.atkCd = u.attackTime * (0.9 + this.rng() * 0.2);
+    u.atkCd = u.attackTime * (0.9 + this.rng() * 0.2) * (u.findBuff('slow') ? 1.5 : 1);   // 緩速
 
     // 隨機決定物理或魔法，再判定是否發動特技
     var magic = this.rng() < u.int / (u.atk + u.int);
@@ -767,15 +768,24 @@
         if (o !== e && cheb(o.x, o.y, e.x, e.y) <= sk.area) targets.push(o);
       });
     }
+    // 主將的中綴特效 (裝備)：破甲、致命一擊、吸血、燃燒 / 混亂 / 緩速
+    var procs = u.isGeneral && this.armies[u.side] && this.armies[u.side].procs;
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
       for (var h = 0; h < (sk.hits || 1) && !t.dead; h++) {
-        var dmg = this.calcDamage(u, t, hit.magic, power, sk.ignoreDef || 0);
+        var ignore = Math.min(0.9, (sk.ignoreDef || 0) + (procs && !hit.magic ? procs.pierce / 100 : 0));
+        var dmg = this.calcDamage(u, t, hit.magic, power, ignore);
         if (t !== e) dmg = Math.max(1, Math.round(dmg * this.aoeMul(t)));   // 範圍波及 (散開陣型減半)
+        if (procs && procs.crit && this.rng() < procs.crit / 100) {
+          dmg *= 2;
+          this.addText(t, '致命!', '#ff4060', 0.9, -0.9);
+        }
         this.applyDamage(t, dmg, hit.magic ? '#e0b0ff' : null);
         if (u.elite) this.eliteOnHit(u, dmg);
+        if (procs && procs.leech && !u.dead) u.hp = Math.min(u.maxHp, u.hp + dmg * procs.leech / 100);
       }
       if (t.dead) continue;
+      if (procs) this.applyProcs(u, t, procs);
       if (sk.debuff) {
         this.addBuff(t, { kind: 'stat', stat: sk.debuff.stat, mul: sk.debuff.mul, t: sk.debuff.dur });
         this.addText(t, sk.debuff.label, '#80b0ff', 0.9, -0.4);
@@ -845,6 +855,7 @@
       if (!e.isGeneral && this.stance[e.side] === 'tight') guard *= S.STANCES.tight.def;
     }
     var dmg = base * strength * matchup * (14 / (guard + 4)) * morale * mul * (0.85 + this.rng() * 0.3);
+    if (!isFinite(dmg)) dmg = 1;
     return Math.max(1, Math.round(dmg));
   };
 
@@ -856,6 +867,19 @@
     e.flashT = 0.12;
     this.addText(e, '-' + dmg, color || (e.side === 0 ? '#a8d8ff' : '#ffc8a8'), 0.8);
     if (e.hp <= 0) this.kill(e);
+  };
+
+  // 中綴特效：依機率讓目標燃燒 / 混亂 / 緩速
+  Battle.prototype.applyProcs = function (u, t, procs) {
+    if (procs.burn && this.rng() < procs.burn / 100) this.applyBurn(u, t, { ratio: 0.3, dur: 3 });
+    if (procs.stun && !t.findBuff('stun') && this.rng() < procs.stun / 100) {
+      this.addBuff(t, { kind: 'stun', t: 1 });
+      this.addText(t, '雷霆', '#ffff80', 0.8, -0.4);
+    }
+    if (procs.slow && this.rng() < procs.slow / 100) {
+      if (!t.findBuff('slow')) this.addText(t, '緩速', '#80d0ff', 0.8, -0.4);
+      this.addBuff(t, { kind: 'slow', t: 2 });
+    }
   };
 
   // 同類狀態只保留一個 (重新施放會刷新時間)

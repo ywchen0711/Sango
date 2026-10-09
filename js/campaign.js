@@ -205,7 +205,7 @@
     return (profile.clearedBy[S.DIFFICULTY_KEYS[i - 1]] || 0) >= S.STAGES.length;
   }
   function stageIlvl(i) { return Math.min(S.MAX_ILVL, i + 1 + D().ilvl); }
-  function battleOpts(i) { return { eliteChance: D().elite, ilvl: stageIlvl(i) }; }
+  function battleOpts(i) { return { eliteChance: D().elite, ilvl: stageIlvl(i), mf: playerArmy().procs.mf }; }
 
   function playerArmy() { return S.playerArmy(profile); }
   function playerLevels() { return S.playerLevels(profile); }
@@ -237,7 +237,10 @@
       '<span class="itag">' + S.QUALITIES[info.q].name + '・' + S.ITEM_SLOTS[info.slot] +
         (info.setId ? '・' + S.SETS[info.setId].name : '') + '</span>' +
       '<span class="idesc">' + info.lines.join('、') + (extra || '') + '</span>' +
-      '<span class="ibtns">' + buttons + '</span></div>';
+      '<span class="ibtns">' + buttons + '</span>' +
+      (info.affixes && info.affixes.length ? '<span class="iaff">' + info.affixes.map(function (a) {
+        return '<span class="aff-' + a.group + '">【' + S.AFFIX_GROUPS[a.group] + '】' + a.name + '：' + a.line + '</span>';
+      }).join('') + '</span>' : '') + '</div>';
   }
   // 和目前裝備比較 (估價高低；戒指和比較差的那枚比)
   function compare(item) {
@@ -351,6 +354,8 @@
           var plus = army[k] - g[k];
           return '<span>' + S.STAT_NAMES[k] + ' ' + army[k] + (plus ? '<small class="plus">(+' + plus + ')</small>' : '') + '</span>';
         }).join('') + '</div>' +
+        (S.PROC_KEYS.some(function (k) { return army.procs[k]; }) ?
+          '<div class="procs">特效：' + S.statLines(army.procs).join('、') + '</div>' : '') +
         '<div class="res"><span class="gold">💰 ' + profile.gold + ' 金</span>' +
           '<span class="exp">⭐ ' + profile.exp + ' 經驗</span>' +
           '<span class="muted">戰績 ' + profile.stats.wins + '勝 ' + profile.stats.losses + '敗</span></div>' +
@@ -591,7 +596,7 @@
     var expBonus = S.game.getExpBonus();   // 經驗壇
     if (win) {
       var rate = (first ? 1 : C.REPLAY_RATE) * mult;
-      gold = Math.round(st.gold * rate);
+      gold = Math.round(st.gold * rate * (1 + playerArmy().procs.gf / 100));   // 聚財
       exp = Math.round(st.exp * rate * (1 + expBonus));
       note = (first ? '首次過關' : '重打獎勵 ' + Math.round(C.REPLAY_RATE * 100) + '%') + (exploring ? '・探索 ×' + S.EXPLORE.REWARD_MULT : '') +
         (D().reward > 1 ? '・' + D().name + ' ×' + D().reward : '') + (expBonus ? '・經驗壇 +' + Math.round(expBonus * 100) + '%' : '');
@@ -606,7 +611,7 @@
     profile.exp += exp;
     // 戰利品：一般出征打贏掉落一件隨機裝備；探索模式是途中撿到的裝備 (輸了也能帶走)；首次過關另有關卡指定的裝備
     // 一般出征：打贏才拿得到 (含精英掉落)；探索模式：撿到的都能帶走
-    var loot = exploring ? S.game.getLoot().slice() : win ? [S.rollLoot(stageIlvl(stageIdx))].concat(S.game.getLoot()) : [];
+    var loot = exploring ? S.game.getLoot().slice() : win ? [S.rollLoot(stageIlvl(stageIdx), playerArmy().procs.mf)].concat(S.game.getLoot()) : [];
     if (win && first) (st.drops || []).forEach(function (dr) { loot.push(S.makeItem(Object.assign({ ilvl: stageIlvl(stageIdx) }, dr))); });
     var lootNotes = loot.map(gainItem);
     // 結算音效：勝利 / 敗北，接著是戰利品中最好的品質

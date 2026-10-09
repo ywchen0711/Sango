@@ -89,7 +89,7 @@
       ex = nx; ey = ny;
     }
     if (ex === g.x && ey === g.y && !hit) return '前方被擋住';
-    cds(g).dash = def.cd;
+    cds(g).dash = def.cd * this.cdMul(side);
     g.invulnT = def.invuln;
     if (ex !== g.x || ey !== g.y) {
       this.occ[this.idx(g.x, g.y)] = null;
@@ -122,7 +122,7 @@
     var why = this.skillBlocked(side, 'whirl');
     if (why) return why;
     var g = this.generals[side], def = S.GENERAL_SKILLS_DEF.whirl, self = this;
-    cds(g).whirl = def.cd;
+    cds(g).whirl = def.cd * this.cdMul(side);
     var hits = this.alive(1 - side).filter(function (e) { return cheb(e.x, e.y, g.x, g.y) <= 1; });
     hits.forEach(function (e) {
       self.applyDamage(e, self.calcDamage(g, e, false, def.power, 0), '#fff080');
@@ -132,6 +132,12 @@
     this.addText(g, def.name + '!', '#fff080', 0.9, -0.6);
     this.sound('skillPhys', g);
     return '';
+  };
+
+  // 技能冷卻倍率 (裝備的「迅捷」中綴)
+  B.cdMul = function (side) {
+    var p = this.armies[side] && this.armies[side].procs;
+    return 1 - (p && p.cdr ? p.cdr / 100 : 0);
   };
 
   // 擊退一格 (後方有空位才會退)

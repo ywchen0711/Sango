@@ -4,7 +4,10 @@
  * 裝備物件 (存在進度裡)：
  *   普通 / 魔法 / 稀有：{ q: 'normal' | 'magic' | 'rare', base, ilvl, affixes: [{ k, pre, t, v }], rname }
  *   暗金：{ q: 'unique', id }      套裝：{ q: 'set', id }
+ *   affixes 的 g：'prefix' 前綴 / 'suffix' 後綴 / 'infix' 中綴 (舊資料用 pre: true/false 表示前 / 後綴)
  * 能力欄位：hp / war / int / lead 加到主將能力；command 開戰軍令；troops 全軍士兵能力 %；speed 主將移動速度 %
+ * 中綴特效 (主將)：burn 燃燒 % / stun 混亂 % / slow 緩速 % / leech 吸血 % / crit 致命一擊 % / pierce 破甲 %
+ *                   cdr 技能冷卻 -% / mf 尋寶 % / gf 聚財 %
  */
 (function (S) {
   'use strict';
@@ -107,8 +110,23 @@
       command: { tiers: [['號令', 3, 1, 1], ['天命', 8, 2, 2], ['王道', 18, 3, 3]], slots: ['weapon', 'helm', 'amulet'], noWeight: true }
     }
   };
+  // 中綴：夾在前綴與後綴之間的特殊效果 (仿暗黑 2 的特效詞綴)，數值單位都是 %，不依部位打折
+  S.AFFIXES.infix = {
+    burn:   { tiers: [['烈焰', 3, 15, 25], ['業火', 15, 26, 40]], slots: ['weapon', 'gloves'] },
+    stun:   { tiers: [['雷霆', 5, 6, 10], ['天雷', 16, 11, 16]], slots: ['weapon'] },
+    slow:   { tiers: [['寒冰', 3, 15, 25], ['玄冰', 15, 26, 40]], slots: ['weapon', 'shield'] },
+    leech:  { tiers: [['嗜血', 4, 3, 5], ['飲血', 16, 6, 9]], slots: ['weapon', 'gloves', 'ring'] },
+    crit:   { tiers: [['致命', 4, 5, 9], ['奪命', 16, 10, 15]], slots: ['weapon', 'gloves', 'ring', 'amulet'] },
+    pierce: { tiers: [['破甲', 3, 10, 18], ['裂甲', 15, 19, 30]], slots: ['weapon'] },
+    cdr:    { tiers: [['迅捷', 5, 8, 14], ['神速', 18, 15, 25]], slots: ['helm', 'amulet', 'ring'] },
+    mf:     { tiers: [['尋寶', 2, 10, 25], ['鴻運', 14, 26, 50]], slots: ['helm', 'amulet', 'ring'] },
+    gf:     { tiers: [['聚財', 2, 15, 35], ['招財', 14, 36, 70]], slots: ['boots', 'belt', 'amulet'] }
+  };
+  S.AFFIX_GROUPS = { prefix: '前綴', infix: '中綴', suffix: '後綴' };
+  function affixGroup(a) { return a.g || (a.pre ? 'prefix' : 'suffix'); }
+  S.affixGroup = affixGroup;
   var STAT_LABEL = { hp: '體力', war: '武力', int: '智力', lead: '統率' };
-  var RARE_NAMES = ['破軍', '血月', '蒼狼', '赤霄', '玄武', '驚雷', '鬼哭', '龍吟', '天狼', '斷魂', '烈焰', '寒霜', '孤星', '飛燕'];
+  var RARE_NAMES = ['破軍', '血月', '蒼狼', '赤霄', '玄武', '蒼穹', '鬼哭', '龍吟', '天狼', '斷魂', '幽冥', '狂龍', '孤星', '飛燕'];   // 避開中綴的名字
 
   // ---- 暗金：固定屬性的名品 ----
   S.UNIQUES = {
@@ -156,9 +174,12 @@
     mengde:      { name: '孟德新書',   slot: 'shield',   set: 'caocao', ilvl: 22, int: 14, command: 2 }
   };
 
-  var STATS = ['hp', 'war', 'int', 'lead', 'command', 'troops', 'speed'];
+  var STATS = ['hp', 'war', 'int', 'lead', 'command', 'troops', 'speed',
+               'burn', 'stun', 'slow', 'leech', 'crit', 'pierce', 'cdr', 'mf', 'gf'];
+  S.PROC_KEYS = ['burn', 'stun', 'slow', 'leech', 'crit', 'pierce', 'cdr', 'mf', 'gf'];
   // 估價：每點能力值多少金
-  var PRICE = { hp: 25, war: 50, int: 40, lead: 40, command: 250, troops: 70, speed: 15 };
+  var PRICE = { hp: 25, war: 50, int: 40, lead: 40, command: 250, troops: 70, speed: 15,
+                burn: 12, stun: 30, slow: 10, leech: 35, crit: 30, pierce: 15, cdr: 20, mf: 8, gf: 4 };
   S.ITEM_SELL_RATE = 0.35;
   S.MAX_ILVL = 30;                // 地獄第 10 關 = 物品等級 30
   S.BAG_SIZE = 100;
@@ -173,14 +194,16 @@
 
   // ======================= 產生裝備 =======================
   // 依物品等級決定品質的機率 (越後面的關卡越容易出好東西)
-  function rollQuality(ilvl) {
+  function rollQuality(ilvl, mf) {
+    var m = (mf || 0) / 100;
+    // 尋寶：普通變少、稀有 / 套裝 / 暗金變多 (套裝與暗金的效果打折，比照暗黑 2)
     var w = [
-      ['normal', Math.max(10, 60 - 4 * ilvl)],
+      ['normal', Math.max(10, 60 - 4 * ilvl) / (1 + m)],
       ['magic', 30],
-      ['rare', Math.min(30, 6 + 1.2 * ilvl)]
+      ['rare', Math.min(30, 6 + 1.2 * ilvl) * (1 + m * 0.8)]
     ];
-    if (eligible(S.SET_ITEMS, ilvl).length) w.push(['set', Math.min(8, 0.5 + 0.3 * ilvl)]);
-    if (eligible(S.UNIQUES, ilvl).length) w.push(['unique', Math.min(10, 1 + 0.4 * ilvl)]);
+    if (eligible(S.SET_ITEMS, ilvl).length) w.push(['set', Math.min(8, 0.5 + 0.3 * ilvl) * (1 + m * 0.6)]);
+    if (eligible(S.UNIQUES, ilvl).length) w.push(['unique', Math.min(10, 1 + 0.4 * ilvl) * (1 + m * 0.6)]);
     return weighted(w);
   }
   function eligible(table, ilvl, slot) {
@@ -194,8 +217,8 @@
     var tiers = def.tiers.map(function (t, i) { return i; }).filter(function (i) { return def.tiers[i][1] <= ilvl; });
     var t = tiers[tiers.length - 1 - Math.floor(S.random() * Math.min(2, tiers.length))];   // 偏向最高的兩個層級
     var tier = def.tiers[t];
-    var w = def.noWeight ? 1 : (S.SLOT_WEIGHT[slot] || 1);   // 小部位的詞綴比較弱
-    return { k: k, pre: group === 'prefix', t: t, v: Math.max(1, Math.round(rnd(tier[2], tier[3]) * w)) };
+    var w = def.noWeight || group === 'infix' ? 1 : (S.SLOT_WEIGHT[slot] || 1);   // 小部位的詞綴比較弱 (中綴不打折)
+    return { k: k, g: group, t: t, v: Math.max(1, Math.round(rnd(tier[2], tier[3]) * w)) };
   }
   function affixPool(group, slot, ilvl, used) {
     return Object.keys(S.AFFIXES[group]).filter(function (k) {
@@ -204,12 +227,12 @@
     });
   }
 
-  // 產生一件裝備：opts = { ilvl, quality?, slot?, unique?, set? }
+  // 產生一件裝備：opts = { ilvl, quality?, slot?, unique?, set?, mf? }
   S.makeItem = function (opts) {
     var ilvl = Math.max(1, Math.min(S.MAX_ILVL, opts.ilvl || 1));
     if (opts.unique) return { q: 'unique', id: opts.unique };
     if (opts.set) return { q: 'set', id: opts.set };
-    var q = opts.quality || rollQuality(ilvl);
+    var q = opts.quality || rollQuality(ilvl, opts.mf);
     if (q === 'unique' || q === 'set') {
       var table = q === 'unique' ? S.UNIQUES : S.SET_ITEMS;
       var ids = eligible(table, ilvl, opts.slot);
@@ -226,32 +249,50 @@
     var base = pick(S.random() < 0.7 ? good : bases);
     var slot = S.ITEM_BASES[base].slot;
     var item = { q: q, base: base, ilvl: ilvl, affixes: [] };
-    var nPre = 0, nSuf = 0;
+    // 詞綴數量 (比照暗黑 2)：魔法 = 前綴 / 後綴各最多 1 條；稀有 = 3 條起，物品等級越高越多，前 / 後綴各最多 3 條
+    // 中綴：魔法 15%、稀有 40% 機率多一條
+    var nPre = 0, nSuf = 0, nInf = 0;
     if (q === 'magic') {
       var r = S.random();
       nPre = r < 0.75 ? 1 : 0;
       nSuf = r >= 0.5 ? 1 : 0;
+      nInf = S.random() < 0.15 ? 1 : 0;
     } else if (q === 'rare') {
-      var n = rnd(3, 4);
-      nPre = Math.min(2, n - 1 - Math.floor(S.random() * 2));
+      var n = 3 + rnd(0, Math.min(3, Math.floor(ilvl / 8)));
+      nPre = Math.max(n - 3, Math.min(3, rnd(1, n - 1)));
       nSuf = n - nPre;
+      nInf = S.random() < 0.4 ? 1 : 0;
     }
-    ['prefix', 'suffix'].forEach(function (group) {
-      var used = [];
-      for (var i = 0; i < (group === 'prefix' ? nPre : nSuf); i++) {
-        var pool = affixPool(group, slot, ilvl, used);
-        if (!pool.length) break;
-        var k = pick(pool);
-        used.push(k);
-        item.affixes.push(rollAffix(group, k, slot, ilvl));
-      }
+    var used = { prefix: [], infix: [], suffix: [] };
+    function addAffix(group) {
+      var pool = affixPool(group, slot, ilvl, used[group]);
+      if (!pool.length) return false;
+      var k = pick(pool);
+      used[group].push(k);
+      item.affixes.push(rollAffix(group, k, slot, ilvl));
+      return true;
+    }
+    var missing = 0;
+    for (var i = 0; i < nPre; i++) if (!addAffix('prefix')) missing++;
+    for (i = 0; i < nSuf; i++) if (!addAffix('suffix')) missing++;
+    for (i = 0; i < nInf; i++) addAffix('infix');
+    // 某一邊的詞綴抽完了 (有些部位能出的詞綴比較少)：改從另一邊補，前 / 後綴各最多 3 條
+    while (missing > 0) {
+      var canPre = used.prefix.length < 3 && affixPool('prefix', slot, ilvl, used.prefix).length;
+      var canSuf = used.suffix.length < 3 && affixPool('suffix', slot, ilvl, used.suffix).length;
+      if (!canPre && !canSuf) break;
+      addAffix(canPre && (!canSuf || S.random() < 0.5) ? 'prefix' : 'suffix');
+      missing--;
+    }
+    item.affixes.sort(function (a, b) {          // 前綴 → 中綴 → 後綴
+      return ['prefix', 'infix', 'suffix'].indexOf(a.g) - ['prefix', 'infix', 'suffix'].indexOf(b.g);
     });
     if (q === 'rare') item.rname = pick(RARE_NAMES);
     return item;
   };
 
-  // 戰利品：打贏第 stage 關 (1–10) 掉落一件
-  S.rollLoot = function (stage) { return S.makeItem({ ilvl: stage }); };
+  // 戰利品：物品等級 ilvl 的隨機裝備；mf = 尋寶 %
+  S.rollLoot = function (ilvl, mf) { return S.makeItem({ ilvl: ilvl, mf: mf }); };
 
   // 商店貨架：以普通 / 魔法為主，偶爾有稀有
   S.rollShop = function (ilvl, n) {
@@ -276,17 +317,20 @@
     }
     var base = S.ITEM_BASES[item.base];
     add(base);
-    var pre = null, suf = null;
+    var names = {}, affixes = [];
     item.affixes.forEach(function (a) {
-      var tier = S.AFFIXES[a.pre ? 'prefix' : 'suffix'][a.k].tiers[a.t];
+      var g = affixGroup(a), tier = S.AFFIXES[g][a.k].tiers[a.t], one = {};
       stats[a.k] += a.v;
-      if (a.pre && !pre) pre = tier[0];
-      if (!a.pre && !suf) suf = tier[0];
+      one[a.k] = a.v;
+      if (!names[g]) names[g] = tier[0];
+      affixes.push({ group: g, name: tier[0], line: statLines(one)[0] });
     });
+    affixes.sort(function (x, y) { return ['prefix', 'infix', 'suffix'].indexOf(x.group) - ['prefix', 'infix', 'suffix'].indexOf(y.group); });
+    // 名字：魔法 = 前綴 + 中綴 + 後綴 + 基底 (例：銳利的烈焰猛虎長槍)；稀有 = 隨機名字 + 基底
     if (item.q === 'rare') name = item.rname + base.name;
-    else if (item.q === 'magic') name = (pre || '') + (suf || '') + base.name;
+    else if (item.q === 'magic') name = (names.prefix || '') + (names.infix || '') + (names.suffix || '') + base.name;
     else name = base.name;
-    return { name: name, slot: base.slot, q: item.q, stats: stats, lines: statLines(stats), setId: null };
+    return { name: name, slot: base.slot, q: item.q, stats: stats, lines: statLines(stats), setId: null, affixes: affixes };
   };
 
   function statLines(st) {
@@ -295,6 +339,15 @@
     if (st.command) lines.push('開戰軍令 +' + st.command);
     if (st.troops) lines.push('全軍士兵能力 +' + st.troops + '%');
     if (st.speed) lines.push('主將移動速度 +' + st.speed + '%');
+    if (st.burn) lines.push(st.burn + '% 機率燃燒目標');
+    if (st.stun) lines.push(st.stun + '% 機率使目標混亂');
+    if (st.slow) lines.push(st.slow + '% 機率緩速目標');
+    if (st.leech) lines.push('吸血 ' + st.leech + '%');
+    if (st.crit) lines.push(st.crit + '% 致命一擊');
+    if (st.pierce) lines.push('破甲 ' + st.pierce + '%');
+    if (st.cdr) lines.push('技能冷卻 -' + st.cdr + '%');
+    if (st.mf) lines.push('尋寶 +' + st.mf + '%');
+    if (st.gf) lines.push('聚財 +' + st.gf + '%');
     return lines;
   }
   S.statLines = statLines;
@@ -357,9 +410,11 @@
   S.playerArmy = function (profile) {
     var g = profile.general;
     var army = { name: g.name, hp: g.hp, war: g.war, int: g.int, lead: g.lead, beard: g.beard,
-                 units: profile.soldiers.slice(), commandBonus: 0, troopBonus: 0, speedBonus: 0 };
+                 units: profile.soldiers.slice(), commandBonus: 0, troopBonus: 0, speedBonus: 0, procs: {} };
+    S.PROC_KEYS.forEach(function (k) { army.procs[k] = 0; });
     function add(st) {
       ['hp', 'war', 'int', 'lead'].forEach(function (k) { if (st[k]) army[k] += st[k]; });
+      S.PROC_KEYS.forEach(function (k) { if (st[k]) army.procs[k] += st[k]; });
       army.commandBonus += st.command || 0;
       army.troopBonus += (st.troops || 0) / 100;
       army.speedBonus += (st.speed || 0) / 100;
@@ -369,6 +424,9 @@
     S.setStatus(equip).forEach(function (s) {
       s.bonus.forEach(function (b) { if (b.active) add(b.stats); });
     });
+    // 上限 (避免疊到無敵)：機率類 75%、吸血 30%、破甲 70%、冷卻 -50%
+    var CAP = { burn: 75, stun: 40, slow: 75, leech: 30, crit: 60, pierce: 70, cdr: 50, mf: 300, gf: 300 };
+    S.PROC_KEYS.forEach(function (k) { army.procs[k] = Math.min(CAP[k], army.procs[k]); });
     return army;
   };
   S.playerLevels = function (profile) {
@@ -399,7 +457,7 @@
     if (it.q === 'set') return S.SET_ITEMS[it.id] ? it : null;
     if (!S.ITEM_BASES[it.base]) return null;
     it.affixes = (it.affixes || []).filter(function (a) {
-      var g = S.AFFIXES[a.pre ? 'prefix' : 'suffix'][a.k];
+      var g = S.AFFIXES[affixGroup(a)] && S.AFFIXES[affixGroup(a)][a.k];
       return g && g.tiers[a.t];
     });
     return it;

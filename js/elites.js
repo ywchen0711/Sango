@@ -62,7 +62,8 @@
       });
     }
     if (e.side !== 1 || !this.lootFound) return;
-    var item = S.makeItem({ ilvl: this.ilvl, quality: this.rng() < 0.75 ? 'magic' : 'rare' });
+    var rare = Math.min(0.6, 0.25 * (1 + this.mf / 100));   // 尋寶提高稀有的機率
+    var item = S.makeItem({ ilvl: this.ilvl, quality: this.rng() < rare ? 'rare' : 'magic' });
     var info = S.itemInfo(item), color = S.QUALITIES[info.q].color;
     this.lootFound.push(item);
     this.addText(e, info.name, color, 1.6, -1.1);

@@ -44,7 +44,7 @@
   function newBattle() {
     battle = S.currentBattle = new S.Battle(armies, { control: [true, false], autoTactics: [chkAutoTac.checked, false],
                                                       levels: levels, explore: explore,
-                                                      eliteChance: extra.eliteChance, ilvl: extra.ilvl });   // S.currentBattle：方便在主控台除錯
+                                                      eliteChance: extra.eliteChance, ilvl: extra.ilvl, mf: extra.mf });   // S.currentBattle：方便在主控台除錯
     battle.setStance(humanSide, stanceKey);
     running = false;
     overFired = false;

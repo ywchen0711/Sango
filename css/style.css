@@ -260,6 +260,15 @@ canvas.pointer { cursor: pointer; }
 .slot.q-set-border { border-color: #2a7a2a; }
 .slot.q-unique-border { border-color: #8a6a3a; }
 
+/* 詞綴分類：前綴 / 中綴 / 後綴 */
+.item .iaff { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 12px; }
+.slot { min-width: 0; overflow-wrap: anywhere; }
+.slot .item .iaff { flex-basis: auto; width: 100%; flex-direction: column; gap: 1px; }
+.aff-prefix { color: #8fb8ff; }
+.aff-infix { color: #e0a0ff; }
+.aff-suffix { color: #90e0a0; }
+.camp-head .procs { flex-basis: 100%; font-size: 13px; color: #e0a0ff; }
+
 /* 背包工具列 */
 .bag-tools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; }
 .bag-tools span { display: inline-flex; flex-wrap: wrap; gap: 3px; align-items: center; }

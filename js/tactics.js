@@ -363,7 +363,7 @@
     var army = this.armies[u.side];
     var self = this;
     if (chest.loot) {               // 探索模式的裝備箱
-      var item = S.rollLoot(this.explore.ilvl), info = S.itemInfo(item), color = S.QUALITIES[info.q].color;
+      var item = S.rollLoot(this.explore.ilvl, this.mf), info = S.itemInfo(item), color = S.QUALITIES[info.q].color;
       if (u.side === 0) this.lootFound.push(item);
       this.addText(u, info.name, color, 1.6, -0.6);
       this.addBurst(u, color);

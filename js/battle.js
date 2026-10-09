@@ -166,6 +166,8 @@
     if (this.explore) this.deployExplore();
     else { this.deploy(0); this.deploy(1); }
     if (opts.eliteChance && !this.explore) this.rollElites(opts.eliteChance);   // 一般出征：敵兵依機率成為精英
+    // 玩家操控的主將一開場就出陣 (沒有被操控時自己找最近的敵人)；電腦方的主將照舊先在後方觀望
+    for (var s = 0; s < 2; s++) if (this.control[s] && this.generals[s]) this.generals[s].engaged = true;
     this.order = this.units.map(function (u, i) { return i; });
   }
 
@@ -314,7 +316,9 @@
       }
       return null;
     }
-    var near = this.unitsNear(1, u.x, u.y, E.ENGAGE);
+    // 主將：畫面上看得到 (不在迷霧裡) 的敵人都會主動去打；士兵只迎擊附近的
+    var near = u.isGeneral ? this.unitsNear(1, u.x, u.y, E.GENERAL_ENGAGE).filter(function (e) { return this.isVisible(e.x, e.y); }, this)
+                           : this.unitsNear(1, u.x, u.y, E.ENGAGE);
     var f = this.focus[0];        // 集火目標：稍遠也會去打
     if (f && !f.dead && !u.isGeneral && cheb(f.x, f.y, u.x, u.y) <= E.CHASE && near.indexOf(f) < 0) near.push(f);
     if (u.order) return this.alive(1);

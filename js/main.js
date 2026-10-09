@@ -10,6 +10,7 @@
   var speedEl = document.getElementById('speed');
   var chkBars = document.getElementById('chk-bars');
   var chkAutoTac = document.getElementById('chk-autotac');
+  var btnSound = document.getElementById('btn-sound');
   var roster = document.getElementById('roster');
   var tacticsEl = document.getElementById('tactics');
   var tacInfo = document.getElementById('tac-info');
@@ -306,6 +307,30 @@
     updateUI();
   }
 
+  // 音效：取出戰鬥登記的事件播放；探索模式依離畫面中心的距離調整音量，太遠就不播
+  function playSfx() {
+    if (!battle.sfx.length) return;
+    var list = battle.sfx;
+    battle.sfx = [];
+    if (!S.Sound) return;
+    var cx = (renderer.cam.x + S.FIELD_W / 2) / S.TILE, cy = (renderer.cam.y + S.FIELD_H / 2) / S.TILE;
+    list.forEach(function (ev) {
+      var vol = 1;
+      if (explore && ev.x != null) {
+        var d = Math.max(Math.abs(ev.x - cx), Math.abs(ev.y - cy));
+        if (d > 22) return;
+        vol = d < 10 ? 1 : 1 - (d - 10) / 16;
+      }
+      S.Sound.play(ev.n, vol);
+    });
+  }
+  btnSound.addEventListener('click', function () {
+    S.Sound.cycle();
+    btnSound.textContent = S.Sound.icon();
+    btnSound.blur();
+    if (S.game.onSettings) S.game.onSettings();
+  });
+
   function frame(ts) {
     var dt = Math.min(0.1, (ts - last) / 1000 || 0);
     last = ts;
@@ -329,6 +354,7 @@
         if (S.game.onOver) S.game.onOver(battle.winner);
       }
     }
+    playSfx();
     uiT -= dt;
     if (uiT <= 0) { uiT = 0.1; updateTactics(); updateLog(); if (aiming) updateAim(); }
     if (hintT > 0) { hintT -= dt; if (hintT <= 0) tacHint.textContent = ''; }
@@ -456,11 +482,12 @@
       updateTactics();
     },
     setCaption: function (c) { renderer.caption = c; },
-    getSettings: function () { return { speed: speed, bars: chkBars.checked, autoTactics: chkAutoTac.checked }; },
+    getSettings: function () { return { speed: speed, bars: chkBars.checked, autoTactics: chkAutoTac.checked, sound: S.Sound.level }; },
     applySettings: function (set) {
       set = set || {};
       if (set.speed) setSpeed(Number(set.speed));
       if (set.bars != null) { chkBars.checked = !!set.bars; renderer.showBars = chkBars.checked; }
+      if (set.sound != null) { S.Sound.setLevel(set.sound); btnSound.textContent = S.Sound.icon(); }
       if (set.autoTactics != null) { chkAutoTac.checked = !!set.autoTactics; if (battle) battle.autoTactics[0] = chkAutoTac.checked; }
     }
   };

@@ -173,6 +173,7 @@
     this.tacticCd[side][id] = tc.cd;
     this.globalCd[side] = S.COMMAND.GLOBAL_CD;
     this.tacticUses[tc.name] = (this.tacticUses[tc.name] || 0) + 1;
+    this.sound('tac_' + id, tx != null ? { x: tx, y: ty } : g);
     this.addText(g, tc.name + '!', tc.color, 1.4, -0.6);
     this.notify(army.name + ' 施展「' + tc.name + '」', tc.color);
     return true;
@@ -354,6 +355,7 @@
       this.addText(u, info.name, color, 1.6, -0.6);
       this.addBurst(u, color);
       this.notify(u.name + ' 打開裝備箱：【' + S.QUALITIES[info.q].name + '】' + info.name, color);
+      this.sound('loot_' + info.q, u);
       return;
     }
     var it = S.CHEST_ITEMS[chest.item];
@@ -361,6 +363,7 @@
     this.addText(u, it.name, it.color, 1.4, -0.6);
     this.addBurst(u, it.color);
     this.notify(army.name + '軍 ' + u.name + ' 開啟寶箱：' + it.name + (chest.item === 'trap' ? '！' : ''), it.color);
+    this.sound(chest.item === 'trap' ? 'boom' : 'chest', u);
 
     if (it.heal) this.heal(u, u.maxHp * it.heal);
     if (it.healAll) this.alive(u.side).forEach(function (a) { self.heal(a, a.maxHp * it.healAll); });
@@ -468,5 +471,6 @@
     this.addText(u, '伏兵!', '#f8d838', 1.6, -0.6);
     this.addBurst(u, '#f8d838');
     this.notify(this.armies[side].name + '軍 伏兵' + S.UNIT_TYPES[type].name + '殺出！', '#f8d838');
+    this.sound('alert');
   };
 })(window.Sango);

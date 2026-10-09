@@ -32,6 +32,10 @@
   var stageIdx = 0;               // 營地選中的關卡
   var campMsg = '';
 
+  function sfx(name, delay) {
+    if (!S.Sound) return;
+    if (delay) setTimeout(function () { S.Sound.play(name); }, delay); else S.Sound.play(name);
+  }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
   function unitName(t) { return S.UNIT_TYPES[t].name; }
   function sortSoldiers() {
@@ -415,6 +419,7 @@
       profile.soldiers.push(d.buy);
       sortSoldiers();
       campMsg = '招募了' + unitName(d.buy);
+      sfx('coin');
       save();
     } else if (d.sell != null) {
       var t = profile.soldiers[Number(d.sell)];
@@ -423,6 +428,7 @@
       profile.soldiers.splice(Number(d.sell), 1);
       profile.gold += refund;
       campMsg = '賣掉一隊' + unitName(t) + '，獲得 ' + refund + ' 金';
+      sfx('coin');
       save();
     } else if (d.up) {
       var sc = S.statCost(profile.general[d.up]);
@@ -430,6 +436,7 @@
       profile.exp -= sc;
       profile.general[d.up] = Math.min(C2.STAT_MAX, profile.general[d.up] + C2.STAT_STEP);
       campMsg = S.STAT_NAMES[d.up] + ' 提升到 ' + profile.general[d.up];
+      sfx('levelup');
       save();
     } else if (d.lv) {
       var lc = S.levelCost(profile.levels[d.lv]);
@@ -437,6 +444,7 @@
       profile.exp -= lc;
       profile.levels[d.lv]++;
       campMsg = unitName(d.lv) + ' 升到 Lv' + profile.levels[d.lv];
+      sfx('levelup');
       save();
     } else if (d.buyitem != null) {
       var bi = profile.shop[Number(d.buyitem)], price = bi && S.itemValue(bi);
@@ -445,11 +453,13 @@
       profile.gold -= price;
       profile.shop.splice(Number(d.buyitem), 1);
       campMsg = '購買了' + S.itemInfo(bi).name + gainItem(bi);
+      sfx('coin');
       save();
     } else if (d.equip != null) {
       var ei = profile.items[Number(d.equip)];
       equipItem(Number(d.equip));
       campMsg = '裝備了' + S.itemInfo(ei).name;
+      sfx('equip');
       save();
     } else if (d.unequip) {
       var ui = profile.equip[d.unequip];
@@ -458,6 +468,7 @@
       profile.items.push(ui);
       profile.equip[d.unequip] = null;
       campMsg = '卸下了' + S.itemInfo(ui).name;
+      sfx('equip');
       save();
     } else if (d.sellitem != null) {
       var si = profile.items[Number(d.sellitem)], gain = S.itemSellPrice(si), sname = S.itemInfo(si).name;
@@ -465,6 +476,7 @@
       profile.items.splice(Number(d.sellitem), 1);
       profile.gold += gain;
       campMsg = '賣掉' + sname + '，獲得 ' + gain + ' 金';
+      sfx('coin');
       save();
     } else if (b.id === 'btn-go') {
       exploring = false;
@@ -551,6 +563,11 @@
     var loot = exploring ? S.game.getLoot().slice() : win ? [S.rollLoot(stageIlvl(stageIdx))].concat(S.game.getLoot()) : [];
     if (win && first) (st.drops || []).forEach(function (dr) { loot.push(S.makeItem(Object.assign({ ilvl: stageIlvl(stageIdx) }, dr))); });
     var lootNotes = loot.map(gainItem);
+    // 結算音效：勝利 / 敗北，接著是戰利品中最好的品質
+    sfx(win ? 'win' : 'lose');
+    var bestQ = -1;
+    loot.forEach(function (it) { bestQ = Math.max(bestQ, S.QUALITY_KEYS.indexOf(S.itemInfo(it).q)); });
+    if (bestQ >= 0) sfx('loot_' + S.QUALITY_KEYS[bestQ], 1300);
     restock();
     save();
 

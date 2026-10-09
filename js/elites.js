@@ -54,6 +54,7 @@
     if (this.hasElite(e, 'fire')) {
       this.addBurst(e, '#ff6020', 'boom');
       this.addText(e, '爆炸!', '#ff6020', 1.2, -0.6);
+      this.sound('boom', e);
       this.alive(1 - e.side).forEach(function (o) {
         if (cheb(o.x, o.y, e.x, e.y) > 1) return;
         self.applyDamage(o, Math.max(1, Math.round(o.maxHp * 0.15)), '#ff8040');
@@ -66,6 +67,7 @@
     this.lootFound.push(item);
     this.addText(e, info.name, color, 1.6, -1.1);
     this.notify('擊倒精英 ' + e.name + '！獲得【' + S.QUALITIES[info.q].name + '】' + info.name, color);
+    this.sound('loot_' + info.q, e);
   };
 
   // 吸血：造成傷害後回復
@@ -98,6 +100,7 @@
     if (n) {
       this.addText(u, '召喚!', '#c080ff', 1.2, -0.6);
       this.notify(u.name + ' 叫出了援兵！', '#c080ff');
+      this.sound('summon', u);
     }
   };
 
@@ -131,5 +134,6 @@
     mine.forEach(function (a) { if (cheb(a.x, a.y, u.x, u.y) <= 6) self.addBurst(a, def.color); });
     this.addText(u, def.name, def.color, 1.8, -0.6);
     this.notify('啟動' + def.name + '：' + def.desc, def.color);
+    this.sound('shrine', u);
   };
 })(window.Sango);

@@ -142,6 +142,7 @@
     this.timeLimit = this.explore ? Infinity : S.TIME_LIMIT;
     this.ilvl = opts.ilvl || (this.explore && this.explore.ilvl) || 1;   // 精英、神壇掉落的物品等級
     this.lootFound = [];          // 這場戰鬥撿到的裝備 (精英掉落、探索的寶箱 / 敵營 / 神壇)
+    this.sfx = [];                // 音效事件 { n: 名稱, x, y }，由 main.js 取出播放 (Node 模擬時沒人取，會被截斷)
     this.initEvents(opts);
     this.walls = new Array(this.cols * this.rows);
     this.occ = new Array(this.cols * this.rows);
@@ -219,11 +220,12 @@
       if (o.dead || o.side !== 1 || o.camp !== camp || o.awake) return;
       o.awake = true;
       o.thinkCd = self.rng() * 0.3;
-      if (first) { self.addText(o, '!', '#ff4040', 1.0, -0.6); first = false; }
+      if (first) { self.addText(o, '!', '#ff4040', 1.0, -0.6); self.sound('alert', o); first = false; }
     });
     if (camp === 0 && !this.bossAwake) {
       this.bossAwake = true;
       this.notify('敵將 ' + this.armies[1].name + ' 察覺了你！', '#ff6040');
+      this.sound('bossAlert');
     }
   };
 
@@ -238,6 +240,7 @@
     var info = S.itemInfo(item);
     this.addText(last, '戰利品!', S.QUALITIES[info.q].color, 1.6, -0.6);
     this.notify('擊破敵營！獲得【' + S.QUALITIES[info.q].name + '】' + info.name, S.QUALITIES[info.q].color);
+    this.sound('loot_' + info.q);
   };
 
   // 援軍：一隊陣亡的士兵帶著一半兵力回到主將身邊
@@ -260,6 +263,7 @@
           this.occ[this.idx(x, y)] = u;
           this.addText(u, '援軍!', '#80c0ff', 1.4, -0.6);
           this.notify(u.name + ' 歸隊了！', '#80c0ff');
+          this.sound('reinforce');
           return;
         }
       }
@@ -316,6 +320,12 @@
   };
   Battle.prototype.isVisible = function (x, y) {
     return !this.explore || (this.inBounds(x, y) && this.vis[this.idx(x, y)] === 1);
+  };
+
+  // 登記音效事件 (at：發生的位置，可省略)
+  Battle.prototype.sound = function (name, at) {
+    if (this.sfx.length > 60) this.sfx.splice(0, 30);
+    this.sfx.push({ n: name, x: at ? at.x : null, y: at ? at.y : null });
   };
 
   // 是否由玩家操控 (主將不會自行出陣，計策由玩家施放)
@@ -712,6 +722,7 @@
         u.mp -= sk.mp;
         this.countSkill(sk);
         this.addText(u, sk.name, magic ? MAGIC_SKILL_COLOR : PHYS_SKILL_COLOR, 1.0, -0.5);
+        this.sound(magic ? 'skillMagic' : 'skillPhys', u);
       }
     }
 
@@ -722,6 +733,7 @@
     u.charged = false;
 
     if (magic || (u.ranged && !adjacent)) {
+      this.sound(magic ? 'magic' : 'arrow', u);
       var dist = euclid(u.x, u.y, e.x, e.y);
       this.projectiles.push({
         sx: u.x, sy: u.y, tx: e.x, ty: e.y, t: 0, dur: 0.1 + dist * (magic ? 0.1 : 0.07),
@@ -729,6 +741,7 @@
         src: u, target: e, hit: hit, side: u.side
       });
     } else {
+      this.sound('hit', u);
       u.lungeT = S.LUNGE_TIME;
       u.lungeDx = sign(e.x - u.x);
       u.lungeDy = sign(e.y - u.y);
@@ -783,6 +796,7 @@
       var amt = u.stat('int') * sk.heal * (0.85 + this.rng() * 0.3);
       amt = Math.max(1, Math.round(amt));
       best.hp = Math.min(best.maxHp, best.hp + amt);
+      this.sound('heal', best);
       this.addText(best, '+' + amt, '#60ff90', 0.9);
       this.addBurst(best, sk.color);
     } else if (sk.buff) {
@@ -795,6 +809,7 @@
         self.addBurst(a, sk.color);
       });
       this.addText(u, sk.buff.label, sk.color, 0.9, -0.4);
+      this.sound('rally', u);
     } else {
       return false;
     }
@@ -867,6 +882,7 @@
     this.occ[this.idx(e.x, e.y)] = null;
     if (this.generalAlive(1 - e.side)) this.gainCommand(1 - e.side, S.COMMAND.PER_KILL);
     var army = this.armies[e.side];
+    this.sound(e.isGeneral ? 'generalDeath' : 'death', e);
     if (e.isGeneral) {
       this.addText(e, army.name + ' 陣亡', '#ff5040', 1.6);
       this.log.push(this.time.toFixed(1) + 's ' + army.name + ' 陣亡');

@@ -102,7 +102,7 @@
       this.effects.push({ fx: 'trail', x: g.fromX, y: g.fromY, x2: ex, y2: ey, color: '#f8f0a0', t: 0, dur: 0.35 });
     }
     g.thinkCd = Math.max(g.thinkCd, g.moveDur + 0.05);
-    if (g.order && g.order.kind !== 'walk') g.order = { kind: 'hold' };
+    if (g.order && g.order.kind !== 'walk') g.order = null;   // 突進後交還給主將自己判斷
     if (hit) {
       this.applyDamage(hit, this.calcDamage(g, hit, false, def.power, 0), '#fff080');
       if (!hit.dead) {

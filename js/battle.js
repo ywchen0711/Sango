@@ -177,7 +177,6 @@
     var mine = this.armies[0];
     var g = this.addUnit(0, 'general', cells[0].x, cells[0].y, mine);
     g.engaged = true;
-    g.order = { kind: 'hold' };   // 主將由玩家操控 (WASD 移動、點敵人攻擊)，不會自己衝出去
     g.maxHp = g.hp = Math.round(g.maxHp * S.EXPLORE.HERO_HP);
     mine.units.forEach(function (t, i) {
       var c = cells[i + 1];

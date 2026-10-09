@@ -204,7 +204,7 @@
     return true;
   };
 
-  // ---- WASD 直接操控主將：按住方向鍵一格一格走，放開後原地固守 ----
+  // ---- WASD 直接操控主將：按住方向鍵一格一格走，放開後交還給主將自己判斷 (自動找最近的敵人) ----
   B.setWalk = function (side, dx, dy) {
     var g = this.generals[side];
     if (!g || g.dead || this.state !== 'fighting') return;
@@ -215,7 +215,8 @@
       g.target = null;
       if (!g.isMoving()) g.thinkCd = 0;
     } else if (g.order && g.order.kind === 'walk') {
-      g.order = { kind: 'hold' };
+      g.order = null;             // 沒有在操控：自動迎擊最近的敵人
+      g.thinkCd = 0;
     }
   };
 
@@ -238,7 +239,8 @@
   // ---- 手動操控主將 ----
   // order：{ kind: 'move', x, y } 走到指定格 (途中不停下交戰)
   //        { kind: 'attack', target } 追擊指定敵人
-  //        { kind: 'hold' } 原地固守，只打射程內的敵人 (抵達目的地 / 目標被擊破後自動轉為固守)
+  //        { kind: 'hold' } 原地固守，只打射程內的敵人
+  // 抵達目的地 / 目標被擊破後清除命令，主將自己去找最近的敵人 (探索模式只找附近的)
   B.commandGeneral = function (side, order) {
     var g = this.generals[side];
     if (!g || g.dead || this.state !== 'fighting') return false;
@@ -261,7 +263,7 @@
     }
     if (o.kind === 'attack') {
       var t = o.target;
-      if (t.dead) { u.order = { kind: 'hold' }; u.thinkCd = 0.1; return; }
+      if (t.dead) { u.order = null; u.thinkCd = 0.1; return; }
       u.target = t;
       if (this.inRangeAt(u, u.x, u.y, t)) {
         if (t.x !== u.x) u.facing = t.x > u.x ? 1 : -1;
@@ -278,7 +280,9 @@
       var arrived = u.x === o.x && u.y === o.y ||
         (!this.isFree(o.x, o.y, u) && Math.max(Math.abs(u.x - o.x), Math.abs(u.y - o.y)) <= 1);   // 目的地被佔住，就停在旁邊
       if (arrived) {
-        u.order = { kind: 'hold' };
+        u.order = null;
+        u.thinkCd = 0.05;
+        return;
       } else {
         if (!this.stepToward(u, o)) u.thinkCd = 0.2;
         return;

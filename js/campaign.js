@@ -70,14 +70,13 @@
       profile.clearedBy = Object.assign({ normal: profile.cleared, nightmare: 0, hell: 0 }, profile.clearedBy);
       if (!diffUnlocked(profile.difficulty)) profile.difficulty = 'normal';
       profile.items = (profile.items || []).map(S.normalizeItem).filter(Boolean);
-      var eq = profile.equip || {};
-      profile.equip = {};
-      S.EQUIP_SLOT_KEYS.forEach(function (slot) {
-        var it = S.normalizeItem(eq[slot]);
-        profile.equip[slot] = it && S.itemInfo(it).slot === slot ? it : null;
-      });
+      // 裝備搬到 10 個位置 (舊版的武器 / 防具 / 寶物三欄也會自動轉換)，放不下的放回背包
+      var moved = S.migrateEquip(profile.equip);
+      profile.equip = moved.equip;
+      profile.items = profile.items.concat(moved.extra);
       profile.shop = (profile.shop || []).map(S.normalizeItem).filter(Boolean);
       if (!profile.shop.length) restock();
+      save();                     // 把轉換後的新格式存回去
       S.game.applySettings(profile.settings);
       stageIdx = Math.min(clr(), S.STAGES.length - 1);
       campMsg = '';
@@ -171,7 +170,7 @@
         soldiers: soldiers,
         levels: { spear: 0, archer: 0, cavalry: 0 },
         items: [],                  // 背包裡 (未裝備) 的裝備
-        equip: { weapon: null, armor: null, treasure: null },
+        equip: S.migrateEquip({}).equip,
         gold: C.START_GOLD,
         exp: 0,
         cleared: 0,
@@ -222,7 +221,8 @@
   function stageLabel(i) { return (diffKey() === 'normal' ? '' : '【' + D().name + '】') + '第 ' + (i + 1) + ' 關 ' + S.STAGES[i].title; }
 
   // ======================= 裝備 =======================
-  var SHOP_SIZE = 6;
+  var SHOP_SIZE = 9;                // 每個部位各一件
+  var bagFilter = 'all', bagSort = 'new';   // 背包的篩選 / 排序
   function shopLevel() { return Math.min(S.MAX_ILVL, clr() + 1 + D().ilvl); }
   function restock() { profile.shop = S.rollShop(shopLevel(), SHOP_SIZE); }
 
@@ -234,29 +234,28 @@
   function itemLine(item, buttons, extra) {
     var info = S.itemInfo(item);
     return '<div class="item">' + itemName(item) +
-      '<span class="itag">' + S.QUALITIES[info.q].name + '・' + S.EQUIP_SLOTS[info.slot] +
+      '<span class="itag">' + S.QUALITIES[info.q].name + '・' + S.ITEM_SLOTS[info.slot] +
         (info.setId ? '・' + S.SETS[info.setId].name : '') + '</span>' +
       '<span class="idesc">' + info.lines.join('、') + (extra || '') + '</span>' +
       '<span class="ibtns">' + buttons + '</span></div>';
   }
-  // 和目前裝備比較 (估價高低)
+  // 和目前裝備比較 (估價高低；戒指和比較差的那枚比)
   function compare(item) {
-    var cur = profile.equip[S.itemInfo(item).slot];
+    var cur = profile.equip[S.equipTarget(profile.equip, item)];
     if (!cur) return ' <small class="up">▲ 空欄</small>';
     var d = S.itemValue(item) - S.itemValue(cur);
     return d > 0 ? ' <small class="up">▲</small>' : d < 0 ? ' <small class="down">▼</small>' : '';
   }
   // 把背包第 i 件裝上，原本那一欄的裝備放回背包
   function equipItem(i) {
-    var item = profile.items[i], slot = S.itemInfo(item).slot;
+    var item = profile.items[i];
     profile.items.splice(i, 1);
-    if (profile.equip[slot]) profile.items.push(profile.equip[slot]);
-    profile.equip[slot] = item;
+    var old = S.equipInto(profile.equip, item);
+    if (old) profile.items.push(old);
   }
   // 放進背包；該欄位空著就直接裝上；背包滿了自動賣掉。回傳說明文字
   function gainItem(item) {
-    var info = S.itemInfo(item);
-    if (!profile.equip[info.slot]) { profile.equip[info.slot] = item; return '（已裝備）'; }
+    if (S.hasEmptySlot(profile.equip, item)) { S.equipInto(profile.equip, item); return '（已裝備）'; }
     if (profile.items.length >= S.BAG_SIZE) {
       var gain = S.itemSellPrice(item);
       profile.gold += gain;
@@ -268,13 +267,13 @@
 
   function renderEquipBox() {
     var sets = S.setStatus(profile.equip);
-    return '<div class="box wide"><h3>裝備 <small>主將的武器 / 防具 / 寶物　' +
+    return '<div class="box wide"><h3>裝備 <small>' +
         S.QUALITY_KEYS.map(function (q) { return '<span class="q-' + q + '">' + S.QUALITIES[q].name + '</span>'; }).join(' ') +
       '</small></h3>' +
-      '<div class="equip-slots">' + S.EQUIP_SLOT_KEYS.map(function (slot) {
+      '<div class="equip-slots doll">' + S.EQUIP_SLOT_KEYS.map(function (slot) {   // 仿暗黑 2 的人形配置
         var item = profile.equip[slot];
-        return '<div class="slot"><span class="slot-name">' + S.EQUIP_SLOTS[slot] + '</span>' +
-          (item ? itemLine(item, '<button data-unequip="' + slot + '">卸下</button>') : '<span class="muted">（無）</span>') + '</div>';
+        return '<div class="slot s-' + slot + (item ? ' q-' + item.q + '-border' : '') + '"><span class="slot-name">' + S.EQUIP_SLOTS[slot] + '</span>' +
+          (item ? itemLine(item, '<button data-unequip="' + slot + '">卸下</button>') : '<span class="muted">（空）</span>') + '</div>';
       }).join('') + '</div>' +
       sets.map(function (s) {
         return '<p class="set-status q-set">套裝「' + s.name + '」' + s.count + '/' + s.total + '：' +
@@ -283,10 +282,12 @@
           }).join('　') + '</p>';
       }).join('') +
       '<h4>背包 <small>' + profile.items.length + ' / ' + S.BAG_SIZE + ' 件</small></h4>' +
-      (profile.items.length ? profile.items.map(function (item, i) {
+      renderBagTools() +
+      (profile.items.length ? bagView().map(function (i) {
+        var item = profile.items[i];
         return itemLine(item, '<button data-equip="' + i + '">裝備</button>' +
           '<button data-sellitem="' + i + '">賣出<small>' + S.itemSellPrice(item) + ' 金</small></button>', compare(item));
-      }).join('') : '<p class="hint">還沒有裝備。打贏戰鬥會掉落裝備，也可以在下方商店購買</p>') +
+      }).join('') || '<p class="hint">這個部位沒有裝備</p>' : '<p class="hint">還沒有裝備。打贏戰鬥會掉落裝備，也可以在下方商店購買</p>') +
       '<h4>商店 <small>物品等級 ' + shopLevel() + '，每場戰鬥後進新貨</small></h4>' +
       profile.shop.map(function (item, i) {
         var price = S.itemValue(item);
@@ -294,6 +295,38 @@
           price + ' 金</small></button>', compare(item));
       }).join('') +
       '</div>';
+  }
+
+  // 背包：篩選 + 排序後要顯示的索引
+  function bagView() {
+    var idx = profile.items.map(function (it, i) { return i; }).filter(function (i) {
+      return bagFilter === 'all' || S.itemInfo(profile.items[i]).slot === bagFilter;
+    });
+    if (bagSort === 'value') idx.sort(function (a, b) { return S.itemValue(profile.items[b]) - S.itemValue(profile.items[a]); });
+    else if (bagSort === 'quality') idx.sort(function (a, b) {
+      return S.QUALITY_KEYS.indexOf(profile.items[b].q) - S.QUALITY_KEYS.indexOf(profile.items[a].q) ||
+        S.itemValue(profile.items[b]) - S.itemValue(profile.items[a]);
+    });
+    else idx.reverse();           // 最新撿到的在前面
+    return idx;
+  }
+  function renderBagTools() {
+    if (!profile.items.length) return '';
+    var count = {};
+    profile.items.forEach(function (it) { count[S.itemInfo(it).slot] = (count[S.itemInfo(it).slot] || 0) + 1; });
+    var nNormal = profile.items.filter(function (it) { return it.q === 'normal'; }).length;
+    var nMagic = profile.items.filter(function (it) { return it.q === 'magic'; }).length;
+    return '<div class="bag-tools"><span class="bag-filter">' +
+      [['all', '全部', profile.items.length]].concat(S.ITEM_SLOT_KEYS.map(function (k) { return [k, S.ITEM_SLOTS[k].split('・')[0], count[k] || 0]; }))
+        .map(function (f) {
+          return '<button data-bagfilter="' + f[0] + '"' + (bagFilter === f[0] ? ' class="on"' : '') + (f[2] ? '' : ' disabled') + '>' +
+            f[1] + '<small>' + f[2] + '</small></button>';
+        }).join('') + '</span>' +
+      '<span class="bag-sort">排序 ' + [['new', '最新'], ['value', '價值'], ['quality', '品質']].map(function (o) {
+        return '<button data-bagsort="' + o[0] + '"' + (bagSort === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>';
+      }).join('') + '</span>' +
+      '<span class="bag-sell"><button data-sellall="normal"' + (nNormal ? '' : ' disabled') + '>賣出全部普通<small>' + nNormal + '</small></button>' +
+      '<button data-sellall="magic"' + (nMagic ? '' : ' disabled') + '>賣出全部魔法<small>' + nMagic + '</small></button></span></div>';
   }
 
   function preview() {
@@ -446,10 +479,23 @@
       campMsg = unitName(d.lv) + ' 升到 Lv' + profile.levels[d.lv];
       sfx('levelup');
       save();
+    } else if (d.bagfilter) {
+      bagFilter = d.bagfilter;
+    } else if (d.bagsort) {
+      bagSort = d.bagsort;
+    } else if (d.sellall) {
+      var list = profile.items.filter(function (it) { return it.q === d.sellall; });
+      var total = list.reduce(function (sum, it) { return sum + S.itemSellPrice(it); }, 0);
+      if (!list.length || !window.confirm('賣掉背包裡全部 ' + list.length + ' 件' + S.QUALITIES[d.sellall].name + '裝備，獲得 ' + total + ' 金？')) return;
+      profile.items = profile.items.filter(function (it) { return it.q !== d.sellall; });
+      profile.gold += total;
+      campMsg = '賣掉 ' + list.length + ' 件' + S.QUALITIES[d.sellall].name + '裝備，獲得 ' + total + ' 金';
+      sfx('coin');
+      save();
     } else if (d.buyitem != null) {
       var bi = profile.shop[Number(d.buyitem)], price = bi && S.itemValue(bi);
       if (!bi || profile.gold < price) return;
-      if (profile.items.length >= S.BAG_SIZE && profile.equip[S.itemInfo(bi).slot]) { campMsg = '背包已滿，先賣掉一些裝備吧'; renderCamp(); return; }
+      if (profile.items.length >= S.BAG_SIZE && !S.hasEmptySlot(profile.equip, bi)) { campMsg = '背包已滿，先賣掉一些裝備吧'; renderCamp(); return; }
       profile.gold -= price;
       profile.shop.splice(Number(d.buyitem), 1);
       campMsg = '購買了' + S.itemInfo(bi).name + gainItem(bi);

@@ -244,8 +244,14 @@ window.Sango = window.Sango || {};
   S.statCost = function (v) { return S.CAMPAIGN.STAT_COST + Math.max(0, v - 75) * 6; };       // 75 以前都是 100
 
   // ---- 裝備 (品質、詞綴、套裝、暗金的資料與邏輯在 js/items.js) ----
-  S.EQUIP_SLOTS = { weapon: '武器', armor: '防具', treasure: '寶物' };
-  S.EQUIP_SLOT_KEYS = ['weapon', 'armor', 'treasure'];
+  // 仿暗黑破壞神 2 的 10 個裝備位置；物品部位 (ITEM_SLOTS) 只有 9 種，戒指可以戴兩枚
+  S.ITEM_SLOTS = { weapon: '武器', shield: '副手', helm: '頭盔', armor: '鎧甲', gloves: '護手',
+                   belt: '腰帶', boots: '戰靴・坐騎', amulet: '護符', ring: '戒指' };
+  S.ITEM_SLOT_KEYS = ['weapon', 'shield', 'helm', 'armor', 'gloves', 'belt', 'boots', 'amulet', 'ring'];
+  S.EQUIP_SLOTS = { helm: '頭盔', amulet: '護符', weapon: '武器', armor: '鎧甲', shield: '副手',
+                    ring1: '戒指', belt: '腰帶', ring2: '戒指', gloves: '護手', boots: '戰靴・坐騎' };
+  S.EQUIP_SLOT_KEYS = ['helm', 'amulet', 'weapon', 'armor', 'shield', 'ring1', 'belt', 'ring2', 'gloves', 'boots'];
+  S.equipKeysFor = function (itemSlot) { return itemSlot === 'ring' ? ['ring1', 'ring2'] : [itemSlot]; };
 
   // 關卡：general 敵將能力，units 敵軍士兵，gold / exp 首次過關獎勵
   // drops 首次過關額外獲得的裝備：{ quality: 'rare' } 隨機稀有、{ unique: id } 暗金、{ set: id } 套裝 (見 js/items.js)
@@ -281,15 +287,15 @@ window.Sango = window.Sango || {};
     { title: '白馬之圍', general: { name: '顏良', hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1 }, gold: 200, exp: 300, drops: [{ unique: 'dilu' }] },
     { title: '延津之戰', general: { name: '文醜', hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 220, exp: 350, drops: [{ unique: 'warDrum' }] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 1, cavalry: 2 }, gold: 220, exp: 350, drops: [{ unique: 'warDrum' }] },
     { title: '合肥之戰', general: { name: '張遼', hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 2, cavalry: 2 }, gold: 240, exp: 400 },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 3 }, gold: 240, exp: 400 },
     { title: '博望坡', general: { name: '夏侯惇', hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 2, cavalry: 3 }, gold: 260, exp: 450, drops: [{ unique: 'qinggang' }] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 4 }, gold: 260, exp: 450, drops: [{ unique: 'qinggang' }] },
     { title: '樊城之戰', general: { name: '關羽', hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 3 }, gold: 300, exp: 500, drops: [{ set: 'dragonBlade' }] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 4, cavalry: 4 }, gold: 300, exp: 500, drops: [{ set: 'dragonBlade' }] },
     { title: '虎牢關', general: { name: '呂布', hp: 98, war: 100, int: 26, lead: 85, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 5, archer: 4, cavalry: 5 }, gold: 500, exp: 600, drops: [{ set: 'halberd' }, { set: 'redHare' }] }
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 6, spear: 6, archer: 5, cavalry: 6 }, gold: 500, exp: 600, drops: [{ set: 'halberd' }, { set: 'redHare' }] }
   ];
 
   // ---- 雙方軍隊 (hp=體力 war=武力 int=智力 lead=統率；統率提升士兵防禦) ----

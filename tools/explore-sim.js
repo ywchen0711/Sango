@@ -32,7 +32,7 @@ function playerAt(k) {
     if (p.levels[key] != null) p.levels[key]++; else p.general[key] = Math.min(100, p.general[key] + 3);
     exp -= 100;
   }
-  if (k > 0) S.EQUIP_SLOT_KEYS.forEach(slot => { p.equip[slot] = S.makeItem({ ilvl: k, quality: 'magic', slot }); });
+  if (k > 0) S.EQUIP_SLOT_KEYS.forEach(key => { p.equip[key] = S.makeItem({ ilvl: k, quality: 'magic', slot: key.replace(/[12]$/, '') }); });
   return p;
 }
 

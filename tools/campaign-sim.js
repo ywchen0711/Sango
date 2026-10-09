@@ -27,14 +27,14 @@ function newPlayer() {
     general: { name: '玩家', hp: each, war: each, int: each, lead: each, beard: null },
     soldiers: ['spear', 'spear', 'archer', 'archer', 'cavalry'],
     levels: { spear: 0, archer: 0, cavalry: 0 },
-    equip: { weapon: null, armor: null, treasure: null },
-    gold: C.START_GOLD, exp: 0, buyIdx: 0, upIdx: 0, shop: S.rollShop(1, 6)
+    equip: S.migrateEquip({}).equip,
+    gold: C.START_GOLD, exp: 0, buyIdx: 0, upIdx: 0, shop: S.rollShop(1, 9)
   };
 }
 
 function gain(p, item) {
-  const slot = S.itemInfo(item).slot, cur = p.equip[slot];
-  if (!cur || S.itemValue(item) > S.itemValue(cur)) p.equip[slot] = item;
+  const key = S.equipTarget(p.equip, item), cur = p.equip[key];
+  if (!cur || S.itemValue(item) > S.itemValue(cur)) p.equip[key] = item;
   else p.gold += S.itemSellPrice(item);
 }
 
@@ -49,7 +49,7 @@ function spend(p) {
     for (;;) {
       let best = -1, bestGain = 0;
       p.shop.forEach((it, i) => {
-        const price = S.itemValue(it), cur = p.equip[S.itemInfo(it).slot];
+        const price = S.itemValue(it), cur = p.equip[S.equipTarget(p.equip, it)];
         const g = price - (cur ? S.itemValue(cur) : 0);
         if (price <= p.gold && g > bestGain) { best = i; bestGain = g; }
       });
@@ -80,7 +80,7 @@ function reward(p, st, k, diff, loot) {
   gain(p, S.rollLoot(ilvl));
   (loot || []).forEach(it => gain(p, it));
   (st.drops || []).forEach(dr => gain(p, S.makeItem(Object.assign({ ilvl }, dr))));
-  p.shop = S.rollShop(Math.min(S.MAX_ILVL, ilvl + 1), 6);
+  p.shop = S.rollShop(Math.min(S.MAX_ILVL, ilvl + 1), 9);
 }
 
 const players = Array.from({ length: P }, newPlayer);
@@ -103,7 +103,7 @@ DIFFS.forEach(diff => S.STAGES.forEach((st, k) => {
     }
   });
   const p = players[0], a = S.playerArmy(p), lv = p.levels;
-  const eq = S.EQUIP_SLOT_KEYS.map(s => p.equip[s] ? S.itemInfo(p.equip[s]).name : '—').join('/');
+  const eq = S.EQUIP_SLOT_KEYS.filter(s => p.equip[s]).length + '/10 件';
   console.log(`${D.name} 第${k + 1}關 ${st.general.name} 勝率 ${(w / games * 100).toFixed(0)}% 平均${(time / games).toFixed(0)}s` +
     ` | 玩家1 兵${p.soldiers.length} Lv 槍${lv.spear} 弓${lv.archer} 騎${lv.cavalry}` +
     ` 體${a.hp} 武${a.war} 智${a.int} 統${a.lead} 士兵+${Math.round(a.troopBonus * 100)}% ${eq} 剩金${p.gold}`);

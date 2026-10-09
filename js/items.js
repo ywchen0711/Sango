@@ -35,32 +35,76 @@
     shanwen: { name: '山文甲', slot: 'armor',    ilvl: 9, hp: 14, lead: 3 },
     yulin:   { name: '魚鱗甲', slot: 'armor',    ilvl: 12, hp: 18, lead: 4 },
     longlin: { name: '龍鱗鎧', slot: 'armor',    ilvl: 22, hp: 24, lead: 6 },
-    charm:   { name: '護身符', slot: 'treasure', ilvl: 1, int: 2 },
-    book:    { name: '兵書',   slot: 'treasure', ilvl: 3, int: 3, lead: 1 },
-    jade:    { name: '玉珮',   slot: 'treasure', ilvl: 5, int: 4, lead: 2 },
-    tally:   { name: '虎符',   slot: 'treasure', ilvl: 7, int: 4, lead: 3 },
-    seal:    { name: '金印',   slot: 'treasure', ilvl: 9, int: 5, lead: 4 },
-    jade2:   { name: '和氏璧', slot: 'treasure', ilvl: 12, int: 7, lead: 5 },
-    xiseal:  { name: '傳國玉璽', slot: 'treasure', ilvl: 22, int: 9, lead: 7 }
+    // 副手：盾牌或兵書
+    woodShield: { name: '木盾',   slot: 'shield', ilvl: 1,  lead: 1, hp: 2 },
+    book:       { name: '兵書',   slot: 'shield', ilvl: 3,  int: 3, lead: 1 },
+    ironShield: { name: '鐵盾',   slot: 'shield', ilvl: 6,  lead: 2, hp: 4 },
+    tigerShield:{ name: '虎頭盾', slot: 'shield', ilvl: 12, lead: 3, hp: 6 },
+    dragonShield:{ name: '龍紋盾', slot: 'shield', ilvl: 22, lead: 5, hp: 9 },
+    // 頭盔
+    headband:   { name: '頭巾',   slot: 'helm',   ilvl: 1,  hp: 1, int: 1 },
+    leatherCap: { name: '皮盔',   slot: 'helm',   ilvl: 4,  hp: 3 },
+    ironHelm:   { name: '鐵盔',   slot: 'helm',   ilvl: 8,  hp: 4, lead: 1 },
+    lionHelm:   { name: '獅頭盔', slot: 'helm',   ilvl: 12, hp: 6, lead: 2 },
+    phoenixHelm:{ name: '鳳翅盔', slot: 'helm',   ilvl: 22, hp: 9, lead: 3 },
+    // 護手
+    clothGlove: { name: '布手套', slot: 'gloves', ilvl: 1,  war: 1 },
+    leatherGlove:{ name: '皮護手', slot: 'gloves', ilvl: 5,  war: 2 },
+    ironGlove:  { name: '鐵護手', slot: 'gloves', ilvl: 10, war: 3, hp: 1 },
+    dragonGlove:{ name: '龍鱗護手', slot: 'gloves', ilvl: 20, war: 5, hp: 2 },
+    // 腰帶
+    sash:       { name: '布帶',   slot: 'belt',   ilvl: 1,  hp: 2 },
+    leatherBelt:{ name: '皮帶',   slot: 'belt',   ilvl: 5,  hp: 3 },
+    jadeBelt:   { name: '玉帶',   slot: 'belt',   ilvl: 10, hp: 5, lead: 1 },
+    lionBelt:   { name: '獅蠻帶', slot: 'belt',   ilvl: 20, hp: 8, lead: 2 },
+    // 戰靴・坐騎 (只有這個部位會出現移動速度)
+    sandals:    { name: '草鞋',   slot: 'boots',  ilvl: 1,  hp: 1 },
+    leatherBoots:{ name: '皮靴',  slot: 'boots',  ilvl: 5,  hp: 2, speed: 5 },
+    warBoots:   { name: '戰靴',   slot: 'boots',  ilvl: 10, hp: 3, speed: 8 },
+    cloudBoots: { name: '雲履',   slot: 'boots',  ilvl: 20, hp: 4, speed: 12 },
+    // 護符
+    charm:      { name: '護身符', slot: 'amulet', ilvl: 1,  int: 2 },
+    jade:       { name: '玉珮',   slot: 'amulet', ilvl: 5,  int: 3, lead: 1 },
+    tally:      { name: '虎符',   slot: 'amulet', ilvl: 7,  int: 3, lead: 2 },
+    seal:       { name: '金印',   slot: 'amulet', ilvl: 9,  int: 4, lead: 3 },
+    jade2:      { name: '和氏璧', slot: 'amulet', ilvl: 12, int: 5, lead: 4 },
+    xiseal:     { name: '傳國玉璽', slot: 'amulet', ilvl: 22, int: 7, lead: 5 },
+    // 戒指
+    copperRing: { name: '銅戒',   slot: 'ring',   ilvl: 1,  war: 1 },
+    silverRing: { name: '銀戒',   slot: 'ring',   ilvl: 6,  war: 1, int: 1 },
+    goldRing:   { name: '金戒',   slot: 'ring',   ilvl: 12, war: 2, int: 2 },
+    jadeRing:   { name: '玉戒',   slot: 'ring',   ilvl: 22, war: 3, int: 3 }
   };
+
+  // 詞綴數值依部位打折 (小部位的詞綴比較弱，全身 10 件加起來約為原本 3 欄的 1.15 倍)
+  S.SLOT_WEIGHT = { weapon: 1, armor: 0.6, shield: 0.35, helm: 0.3, amulet: 0.3,
+                    gloves: 0.2, belt: 0.2, boots: 0.2, ring: 0.15 };
 
   // ---- 詞綴：前綴 (形容詞) / 後綴 (名詞)，各三個層級 ----
   // tiers：[名稱, 最低物品等級, 最小值, 最大值]；troops / speed 的數值單位是 %
   // slots：只會出現在哪些欄位 (省略 = 全部)
   S.AFFIXES = {
     prefix: {
-      war:   { tiers: [['鋒利的', 1, 1, 3], ['銳利的', 4, 4, 6], ['無雙的', 7, 7, 9], ['萬夫莫敵的', 12, 10, 13], ['天下無雙的', 22, 14, 18]] },
-      hp:    { tiers: [['結實的', 1, 2, 4], ['堅固的', 4, 5, 8], ['不壞的', 7, 9, 12], ['金剛的', 12, 13, 17], ['不朽的', 22, 18, 24]] },
-      int:   { tiers: [['聰慧的', 1, 1, 3], ['睿智的', 4, 4, 6], ['神算的', 7, 7, 9], ['鬼謀的', 12, 10, 13], ['天機的', 22, 14, 18]] },
-      lead:  { tiers: [['勇猛的', 1, 1, 3], ['威嚴的', 4, 3, 5], ['霸氣的', 7, 6, 8], ['王者的', 12, 9, 11], ['帝王的', 22, 12, 15]] },
-      speed: { tiers: [['輕快的', 3, 8, 15], ['疾風的', 7, 16, 25], ['追風的', 15, 26, 35]], slots: ['armor', 'treasure'] }
+      war:   { tiers: [['鋒利的', 1, 1, 3], ['銳利的', 4, 4, 6], ['無雙的', 7, 7, 9], ['萬夫莫敵的', 12, 10, 13], ['天下無雙的', 22, 14, 18]],
+               slots: ['weapon', 'gloves', 'ring', 'amulet', 'helm'] },
+      hp:    { tiers: [['結實的', 1, 2, 4], ['堅固的', 4, 5, 8], ['不壞的', 7, 9, 12], ['金剛的', 12, 13, 17], ['不朽的', 22, 18, 24]],
+               slots: ['armor', 'shield', 'helm', 'belt', 'boots', 'ring'] },
+      int:   { tiers: [['聰慧的', 1, 1, 3], ['睿智的', 4, 4, 6], ['神算的', 7, 7, 9], ['鬼謀的', 12, 10, 13], ['天機的', 22, 14, 18]],
+               slots: ['weapon', 'shield', 'helm', 'amulet', 'ring'] },
+      lead:  { tiers: [['勇猛的', 1, 1, 3], ['威嚴的', 4, 3, 5], ['霸氣的', 7, 6, 8], ['王者的', 12, 9, 11], ['帝王的', 22, 12, 15]],
+               slots: ['armor', 'shield', 'helm', 'belt', 'amulet', 'gloves'] },
+      speed: { tiers: [['輕快的', 3, 8, 15], ['疾風的', 7, 16, 25], ['追風的', 15, 26, 35]], slots: ['boots'], noWeight: true }
     },
     suffix: {
-      war:     { tiers: [['猛虎', 1, 1, 3], ['蛟龍', 4, 4, 6], ['霸王', 7, 7, 9], ['戰神', 12, 10, 13], ['武神', 22, 14, 18]] },
-      hp:      { tiers: [['活力', 1, 2, 4], ['巨人', 4, 5, 8], ['不死鳥', 7, 9, 12], ['玄武', 12, 13, 17], ['麒麟', 22, 18, 24]] },
-      int:     { tiers: [['賢者', 1, 1, 3], ['臥龍', 5, 4, 7], ['鳳雛', 12, 8, 11], ['仙人', 22, 12, 16]] },
-      troops:  { tiers: [['兵勢', 2, 1, 2], ['軍威', 5, 3, 4], ['霸業', 8, 5, 6], ['天下', 14, 7, 8], ['一統', 24, 9, 11]] },
-      command: { tiers: [['號令', 3, 1, 1], ['天命', 8, 2, 2], ['王道', 18, 3, 3]], slots: ['weapon', 'treasure'] }
+      war:     { tiers: [['猛虎', 1, 1, 3], ['蛟龍', 4, 4, 6], ['霸王', 7, 7, 9], ['戰神', 12, 10, 13], ['武神', 22, 14, 18]],
+                 slots: ['weapon', 'gloves', 'ring', 'amulet'] },
+      hp:      { tiers: [['活力', 1, 2, 4], ['巨人', 4, 5, 8], ['不死鳥', 7, 9, 12], ['玄武', 12, 13, 17], ['麒麟', 22, 18, 24]],
+                 slots: ['armor', 'shield', 'helm', 'belt', 'boots', 'ring', 'gloves'] },
+      int:     { tiers: [['賢者', 1, 1, 3], ['臥龍', 5, 4, 7], ['鳳雛', 12, 8, 11], ['仙人', 22, 12, 16]],
+                 slots: ['shield', 'helm', 'amulet', 'ring'] },
+      troops:  { tiers: [['兵勢', 2, 1, 2], ['軍威', 5, 3, 4], ['霸業', 8, 5, 6], ['天下', 14, 7, 8], ['一統', 24, 9, 11]],
+                 slots: ['weapon', 'helm', 'amulet', 'shield'] },
+      command: { tiers: [['號令', 3, 1, 1], ['天命', 8, 2, 2], ['王道', 18, 3, 3]], slots: ['weapon', 'helm', 'amulet'], noWeight: true }
     }
   };
   var STAT_LABEL = { hp: '體力', war: '武力', int: '智力', lead: '統率' };
@@ -68,24 +112,31 @@
 
   // ---- 暗金：固定屬性的名品 ----
   S.UNIQUES = {
-    dilu:      { name: '的盧',     slot: 'treasure', ilvl: 3,  speed: 30, hp: 8 },
+    dilu:      { name: '的盧',     slot: 'boots',    ilvl: 3,  speed: 30, hp: 8 },
+    tigerClaw: { name: '虎爪',     slot: 'gloves',   ilvl: 4,  war: 6, hp: 4 },
     mingguang: { name: '明光鎧',   slot: 'armor',    ilvl: 4,  hp: 20, lead: 8 },
-    sunzi:     { name: '孫子兵法', slot: 'treasure', ilvl: 5,  int: 12, command: 2 },
-    warDrum:   { name: '戰鼓',     slot: 'treasure', ilvl: 6,  troops: 6, lead: 3 },
+    sunzi:     { name: '孫子兵法', slot: 'shield',   ilvl: 5,  int: 12, command: 2 },
+    warDrum:   { name: '戰鼓',     slot: 'amulet',   ilvl: 6,  troops: 6, lead: 3 },
+    yuanyang:  { name: '鴛鴦戒',   slot: 'ring',     ilvl: 7,  war: 4, int: 4 },
+    baihua:    { name: '百花戰袍腰帶', slot: 'belt', ilvl: 9,  hp: 10, lead: 4 },
+    tengjia:   { name: '藤甲盾',   slot: 'shield',   ilvl: 10, hp: 12, lead: 6 },
+    zhuge:     { name: '綸巾',     slot: 'helm',     ilvl: 11, int: 10, command: 1 },
     qinggang:  { name: '青釭劍',   slot: 'weapon',   ilvl: 6,  war: 12, int: 4 },
     yitian:    { name: '倚天劍',   slot: 'weapon',   ilvl: 8,  war: 14, command: 1 },
     shemao:    { name: '丈八蛇矛', slot: 'weapon',   ilvl: 14, war: 22, hp: 8 },
-    taiping:   { name: '太平要術', slot: 'treasure', ilvl: 15, int: 20, command: 2 },
+    taiping:   { name: '太平要術', slot: 'shield',   ilvl: 15, int: 20, command: 2 },
+    shuanggu:  { name: '雙股劍戒', slot: 'ring',     ilvl: 16, war: 8, hp: 6 },
     xuanwu:    { name: '玄武甲',   slot: 'armor',    ilvl: 16, hp: 32, lead: 10 },
     qixing:    { name: '七星寶刀', slot: 'weapon',   ilvl: 18, war: 18, int: 10, command: 1 },
-    jueying:   { name: '絕影',     slot: 'treasure', ilvl: 20, speed: 50, hp: 14, war: 6 },
-    bawangyin: { name: '霸王之印', slot: 'treasure', ilvl: 25, troops: 10, war: 8, lead: 8 }
+    jueying:   { name: '絕影',     slot: 'boots',    ilvl: 20, speed: 50, hp: 14, war: 6 },
+    bawangyin: { name: '霸王之印', slot: 'amulet',   ilvl: 25, troops: 10, war: 8, lead: 8 },
+    tianshen:  { name: '天神護手', slot: 'gloves',   ilvl: 24, war: 12, hp: 8, troops: 3 }
   };
 
   // ---- 套裝：bonus[n] = 同一套穿滿 n 件時的額外加成 ----
   S.SETS = {
-    lubu:   { name: '飛將', pieces: ['halberd', 'beastArmor', 'redHare'],
-              bonus: { 2: { war: 6 }, 3: { troops: 6, command: 2 } } },
+    lubu:   { name: '飛將', pieces: ['halberd', 'beastArmor', 'redHare', 'zijinHelm', 'lionmanBelt'],
+              bonus: { 2: { war: 6 }, 3: { troops: 6, command: 2 }, 5: { war: 12, hp: 20, troops: 6 } } },
     guanyu: { name: '武聖', pieces: ['dragonBlade', 'greenRobe', 'chunqiu'],
               bonus: { 2: { lead: 6 }, 3: { war: 8, troops: 5 } } },
     caocao: { name: '魏武', pieces: ['weiSword', 'weiRobe', 'mengde'],
@@ -94,13 +145,15 @@
   S.SET_ITEMS = {
     halberd:     { name: '方天畫戟',   slot: 'weapon',   set: 'lubu',   ilvl: 10, war: 18 },
     beastArmor:  { name: '獸面吞頭鎧', slot: 'armor',    set: 'lubu',   ilvl: 9,  hp: 16, lead: 4 },
-    redHare:     { name: '赤兔馬',     slot: 'treasure', set: 'lubu',   ilvl: 10, war: 5, speed: 40 },
+    redHare:     { name: '赤兔馬',     slot: 'boots',    set: 'lubu',   ilvl: 10, war: 5, speed: 40 },
+    zijinHelm:   { name: '紫金冠',     slot: 'helm',     set: 'lubu',   ilvl: 10, hp: 8, lead: 4 },
+    lionmanBelt: { name: '獅蠻寶帶',   slot: 'belt',     set: 'lubu',   ilvl: 10, hp: 10, war: 3 },
     dragonBlade: { name: '青龍偃月刀', slot: 'weapon',   set: 'guanyu', ilvl: 9,  war: 15, lead: 5 },
     greenRobe:   { name: '綠錦戰袍',   slot: 'armor',    set: 'guanyu', ilvl: 8,  hp: 12, int: 4 },
-    chunqiu:     { name: '春秋左傳',   slot: 'treasure', set: 'guanyu', ilvl: 8,  int: 8, lead: 4 },
+    chunqiu:     { name: '春秋左傳',   slot: 'shield',   set: 'guanyu', ilvl: 8,  int: 8, lead: 4 },
     weiSword:    { name: '魏武劍',     slot: 'weapon',   set: 'caocao', ilvl: 20, war: 16, int: 6 },
     weiRobe:     { name: '魏武袍',     slot: 'armor',    set: 'caocao', ilvl: 20, hp: 22, lead: 8 },
-    mengde:      { name: '孟德新書',   slot: 'treasure', set: 'caocao', ilvl: 22, int: 14, command: 2 }
+    mengde:      { name: '孟德新書',   slot: 'shield',   set: 'caocao', ilvl: 22, int: 14, command: 2 }
   };
 
   var STATS = ['hp', 'war', 'int', 'lead', 'command', 'troops', 'speed'];
@@ -108,7 +161,7 @@
   var PRICE = { hp: 25, war: 50, int: 40, lead: 40, command: 250, troops: 70, speed: 15 };
   S.ITEM_SELL_RATE = 0.35;
   S.MAX_ILVL = 30;                // 地獄第 10 關 = 物品等級 30
-  S.BAG_SIZE = 24;
+  S.BAG_SIZE = 100;
 
   function rnd(a, b) { return a + Math.floor(S.random() * (b - a + 1)); }
   function pick(list) { return list[Math.floor(S.random() * list.length)]; }
@@ -141,7 +194,8 @@
     var tiers = def.tiers.map(function (t, i) { return i; }).filter(function (i) { return def.tiers[i][1] <= ilvl; });
     var t = tiers[tiers.length - 1 - Math.floor(S.random() * Math.min(2, tiers.length))];   // 偏向最高的兩個層級
     var tier = def.tiers[t];
-    return { k: k, pre: group === 'prefix', t: t, v: rnd(tier[2], tier[3]) };
+    var w = def.noWeight ? 1 : (S.SLOT_WEIGHT[slot] || 1);   // 小部位的詞綴比較弱
+    return { k: k, pre: group === 'prefix', t: t, v: Math.max(1, Math.round(rnd(tier[2], tier[3]) * w)) };
   }
   function affixPool(group, slot, ilvl, used) {
     return Object.keys(S.AFFIXES[group]).filter(function (k) {
@@ -204,7 +258,7 @@
     var list = [];
     for (var i = 0; i < n; i++) {
       list.push(S.makeItem({ ilvl: ilvl, quality: weighted([['normal', 50], ['magic', 42], ['rare', 8]]),
-                             slot: S.EQUIP_SLOT_KEYS[i % 3] }));
+                             slot: S.ITEM_SLOT_KEYS[i % S.ITEM_SLOT_KEYS.length] }));
     }
     return list;
   };
@@ -251,6 +305,36 @@
     return Math.max(10, Math.round(v * S.QUALITIES[info.q].mult / 10) * 10);
   };
   S.itemSellPrice = function (item) { return Math.floor(S.itemValue(item) * S.ITEM_SELL_RATE); };
+
+  // ======================= 裝備位置 =======================
+  // 這件裝備要放的位置：有空位放空位；戒指兩格都滿時換掉比較差的那枚
+  S.equipTarget = function (equip, item) {
+    var keys = S.equipKeysFor(S.itemInfo(item).slot);
+    for (var i = 0; i < keys.length; i++) if (!equip[keys[i]]) return keys[i];
+    var best = keys[0];
+    keys.forEach(function (k) { if (S.itemValue(equip[k]) < S.itemValue(equip[best])) best = k; });
+    return best;
+  };
+  // 裝上；回傳被換下來的裝備 (沒有就是 null)
+  S.equipInto = function (equip, item) {
+    var key = S.equipTarget(equip, item), old = equip[key] || null;
+    equip[key] = item;
+    return old;
+  };
+  S.hasEmptySlot = function (equip, item) {
+    return S.equipKeysFor(S.itemInfo(item).slot).some(function (k) { return !equip[k]; });
+  };
+  // 舊版存檔 (武器 / 防具 / 寶物三欄) 轉成 10 個位置；放不下的回傳在 extra
+  S.migrateEquip = function (old) {
+    var equip = {}, extra = [];
+    S.EQUIP_SLOT_KEYS.forEach(function (k) { equip[k] = null; });
+    Object.keys(old || {}).forEach(function (k) {
+      var it = S.normalizeItem(old[k]);
+      if (!it) return;
+      if (S.hasEmptySlot(equip, it)) S.equipInto(equip, it); else extra.push(it);
+    });
+    return { equip: equip, extra: extra };
+  };
 
   // ======================= 套裝加成 / 上場軍隊 =======================
   // 回傳 [{ id, name, count, total, bonus: [{ n, stats, active }] }]

@@ -242,6 +242,29 @@ canvas.pointer { cursor: pointer; }
 
 /* ---- 裝備 ---- */
 .box.wide { grid-column: 1 / -1; }
+
+/* 仿暗黑破壞神 2 的人形配置 */
+.equip-slots.doll {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    ".      helm   amulet"
+    "weapon armor  shield"
+    "ring1  belt   ring2"
+    "gloves .      boots";
+}
+.s-helm { grid-area: helm; } .s-amulet { grid-area: amulet; } .s-weapon { grid-area: weapon; }
+.s-armor { grid-area: armor; } .s-shield { grid-area: shield; } .s-ring1 { grid-area: ring1; }
+.s-belt { grid-area: belt; } .s-ring2 { grid-area: ring2; } .s-gloves { grid-area: gloves; } .s-boots { grid-area: boots; }
+.slot.q-magic-border { border-color: #4a5c9a; }
+.slot.q-rare-border { border-color: #8a7a30; }
+.slot.q-set-border { border-color: #2a7a2a; }
+.slot.q-unique-border { border-color: #8a6a3a; }
+
+/* 背包工具列 */
+.bag-tools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; }
+.bag-tools span { display: inline-flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.bag-tools button { padding: 2px 8px; font-size: 13px; }
+.bag-tools button.on { background: #24405a; border-color: #80c0ff; }
 .box h4 { font-size: 14px; margin: 4px 0 0; color: var(--muted); font-weight: normal; }
 .equip-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .slot { border: 1px solid #3a3a4a; border-radius: 4px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
@@ -254,7 +277,10 @@ canvas.pointer { cursor: pointer; }
 .slot .item { flex-direction: column; align-items: flex-start; }
 .slot-tag { color: var(--muted); font-size: 12px; }
 .camp-head .plus { color: #80e0ff; margin-left: 2px; }
-@media (max-width: 600px) { .equip-slots { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .equip-slots, .equip-slots.doll { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: none; }
+  .equip-slots.doll .slot { grid-area: auto; }
+}
 
 /* ---- 難度 ---- */
 .diffs { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -103,6 +103,7 @@
       tone(220, 1.6, 'sine', 0.25, null, 0, 0.005); tone(441, 1.2, 'sine', 0.12); tone(663, 0.9, 'sine', 0.08);
       tone(1760, 0.6, 'triangle', 0.04, null, 0.05); noise(0.3, 0.1, 'bandpass', 4000, 2000, 0, 4);
     },
+    click:       function () { tone(880, 0.04, 'square', 0.035); },
     coin:        function () { tone(1319, 0.06, 'square', 0.06); tone(1760, 0.12, 'square', 0.06, null, 0.06); },
     equip:       function () { noise(0.06, 0.25, 'bandpass', 3000, 1500, 0, 3); tone(400, 0.08, 'square', 0.05, 300); },
     levelup:     function () { arp([523, 659, 784, 1047], 0.07, 0.2, 'triangle', 0.1); },

@@ -41,6 +41,11 @@
   var BARRACKS = 30;              // 營舍上限 (出戰最多 S.CAMPAIGN.MAX_UNITS 隊)
   var RECRUITS = 6;               // 徵兵處的候選人數
   var pickedId = null;            // 營舍裡選中的士兵
+  // 營地的分頁：出征 / 主將 / 營舍 / 酒館 / 商店 (記在這台裝置上)
+  var CAMP_TABS = [['go', '⚔ 出征'], ['general', '👤 主將'], ['barracks', '🏕 營舍'], ['tavern', '🍶 酒館'], ['shop', '🏪 商店']];
+  var campTab = 'go';
+  try { campTab = localStorage.getItem('sango.campTab') || 'go'; } catch (e) { /* 無痕模式等 */ }
+  if (!CAMP_TABS.some(function (t) { return t[0] === campTab; })) campTab = 'go';
   function activeCount() { return profile.soldiers.filter(function (x) { return x.active; }).length; }
   function findSoldier(id) { for (var i = 0; i < profile.soldiers.length; i++) if (profile.soldiers[i].id === id) return profile.soldiers[i]; return null; }
   function className(sol) { return S.CLASSES[sol.cls].name; }
@@ -54,7 +59,7 @@
     createEl.hidden = v !== 'create';
     campEl.hidden = v !== 'camp';
     resultEl.hidden = v !== 'result';
-    fieldEl.hidden = v === 'create' || v == null;
+    fieldEl.hidden = v === 'create' || v == null || (v === 'camp' && campTab !== 'go');
   }
 
   // ======================= 讀取進度 =======================
@@ -300,17 +305,27 @@
       }).join('') +
       '<h4>背包 <small>' + profile.items.length + ' / ' + S.BAG_SIZE + ' 件</small></h4>' +
       renderBagTools() +
-      (profile.items.length ? bagView().map(function (i) {
-        var item = profile.items[i];
-        return itemLine(item, '<button data-equip="' + i + '">裝備</button>' +
-          '<button data-sellitem="' + i + '">賣出<small>' + S.itemSellPrice(item) + ' 金</small></button>', compare(item));
-      }).join('') || '<p class="hint">這個部位沒有裝備</p>' : '<p class="hint">還沒有裝備。打贏戰鬥會掉落裝備，也可以在下方商店購買</p>') +
-      '<h4>商店 <small>物品等級 ' + shopLevel() + '，每場戰鬥後進新貨</small></h4>' +
-      profile.shop.map(function (item, i) {
+      renderBagList(true) +
+      '</div>';
+  }
+  // 背包清單：主將分頁可以裝備 + 賣出；商店分頁只賣出
+  function renderBagList(canEquip) {
+    return profile.items.length ? bagView().map(function (i) {
+      var item = profile.items[i];
+      return itemLine(item, (canEquip ? '<button data-equip="' + i + '">裝備</button>' : '') +
+        '<button data-sellitem="' + i + '">賣出<small>' + S.itemSellPrice(item) + ' 金</small></button>', compare(item));
+    }).join('') || '<p class="hint">這個部位沒有裝備</p>' : '<p class="hint">還沒有裝備。打贏戰鬥會掉落裝備，也可以到「商店」購買</p>';
+  }
+  function renderShop() {
+    return '<div class="box wide"><h3>商店 <small>物品等級 ' + shopLevel() + '，每場戰鬥後進新貨</small></h3>' +
+      (profile.shop.length ? profile.shop.map(function (item, i) {
         var price = S.itemValue(item);
         return itemLine(item, '<button data-buyitem="' + i + '"' + (profile.gold < price ? ' disabled' : '') + '>購買<small>' +
           price + ' 金</small></button>', compare(item));
-      }).join('') +
+      }).join('') : '<p class="hint">貨架空了，打完下一場戰鬥會進新貨</p>') +
+      '</div>' +
+      '<div class="box wide"><h3>賣出 <small>背包 ' + profile.items.length + ' / ' + S.BAG_SIZE + ' 件</small></h3>' +
+      renderBagTools() + renderBagList(false) +
       '</div>';
   }
 
@@ -432,9 +447,7 @@
 
   function renderCamp() {
     show('camp');
-    var g = profile.general, st = S.STAGES[stageIdx];
-    var first = stageIdx >= clr();
-    var rate = (first ? 1 : C.REPLAY_RATE) * D().reward;
+    var g = profile.general;
     var army = playerArmy();          // 含裝備加成
 
     campEl.innerHTML =
@@ -450,8 +463,50 @@
           '<span class="muted">戰績 ' + profile.stats.wins + '勝 ' + profile.stats.losses + '敗</span></div>' +
       '</div>' +
       (campMsg ? '<p class="msg">' + esc(campMsg) + '</p>' : '') +
+      '<nav class="camp-tabs">' + CAMP_TABS.map(function (t) {
+        return '<button data-tab="' + t[0] + '"' + (t[0] === campTab ? ' class="on"' : '') + '>' + t[1] + tabBadge(t[0]) + '</button>';
+      }).join('') + '</nav>' +
+      '<div class="camp-page">' + renderTab() + '</div>' +
+      '<div class="camp-foot"><button id="btn-reset" class="danger">重新建立武將</button></div>';
 
-      '<div class="diffs">' + S.DIFFICULTY_KEYS.map(function (k, i) {
+    if (campTab === 'go') preview();
+  }
+
+  // 分頁上的提示：可以升級 / 有技能點 / 有新的人或貨
+  function tabBadge(tab) {
+    var g = profile.general, n = 0;
+    if (tab === 'general') n = S.STAT_KEYS.some(function (k) { return g[k] < C.STAT_MAX && profile.exp >= S.statCost(g[k]); }) ? '▲' : 0;
+    if (tab === 'barracks') n = profile.soldiers.reduce(function (s, sol) { return s + (sol.sp || 0); }, 0);
+    if (tab === 'tavern') n = profile.recruits.length;
+    if (tab === 'shop') n = profile.shop.length;
+    return n ? '<small class="badge' + (tab === 'general' || tab === 'barracks' ? ' hot' : '') + '">' + n + '</small>' : '';
+  }
+
+  function renderTab() {
+    var g = profile.general, st = S.STAGES[stageIdx];
+    var first = stageIdx >= clr();
+    var rate = (first ? 1 : C.REPLAY_RATE) * D().reward;
+    if (campTab === 'general') {
+      return '<div class="camp-cols">' +
+        '<div class="box"><h3>主將能力 <small>用經驗值（目前 ' + profile.exp + '）</small></h3>' +
+          '<table class="ups"><tbody>' +
+          S.STAT_KEYS.map(function (k) {
+            var max = g[k] >= C.STAT_MAX, cost = S.statCost(g[k]);
+            return '<tr><th>' + S.STAT_NAMES[k] + '</th><td>' + g[k] + '</td><td>' +
+              '<button data-up="' + k + '"' + (max || profile.exp < cost ? ' disabled' : '') +
+              ' title="' + STAT_DESC[k] + '">' + (max ? '已達上限' : '+' + C.STAT_STEP + '<small>' + cost + ' 經驗</small>') +
+              '</button></td></tr>';
+          }).join('') +
+          '</tbody></table>' +
+          '<p class="hint">士兵的等級與技能在「營舍」裡各自提升</p>' +
+        '</div>' +
+        renderEquipBox() +
+      '</div>';
+    }
+    if (campTab === 'barracks') return '<div class="camp-cols">' + renderBarracks() + '</div>';
+    if (campTab === 'tavern') return '<div class="camp-cols">' + renderRecruits() + '</div>';
+    if (campTab === 'shop') return '<div class="camp-cols">' + renderShop() + '</div>';
+    return '<div class="diffs">' + S.DIFFICULTY_KEYS.map(function (k, i) {
         var dd = S.DIFFICULTIES[k], open = diffUnlocked(k);
         return '<button class="diff' + (k === diffKey() ? ' selected' : '') + '" data-diff="' + k + '"' + (open ? '' : ' disabled') +
           ' style="--dc:' + dd.color + '" title="' + (open ? '敵軍 +' + dd.lv + ' 級、物品等級 +' + dd.ilvl + '、獎勵 ×' + dd.reward :
@@ -485,28 +540,7 @@
         '<div class="go-btns"><button id="btn-go" class="primary big" title="一場定勝負的會戰">⚔ 出征</button>' +
           '<button id="btn-explore" class="primary big explore" title="在 20 倍大的地圖上四處探索、擊破敵營、開寶箱，最後打倒敵將">🗺 探索</button>' +
           '<small>探索：獎勵 ×' + S.EXPLORE.REWARD_MULT + '，途中撿到的裝備都能帶走</small></div>' +
-      '</div>' +
-
-      '<div class="camp-cols">' +
-        renderBarracks() +
-        renderRecruits() +
-        '<div class="box"><h3>主將能力 <small>用經驗值</small></h3>' +
-          '<table class="ups"><tbody>' +
-          S.STAT_KEYS.map(function (k) {
-            var max = g[k] >= C.STAT_MAX, cost = S.statCost(g[k]);
-            return '<tr><th>' + S.STAT_NAMES[k] + '</th><td>' + g[k] + '</td><td>' +
-              '<button data-up="' + k + '"' + (max || profile.exp < cost ? ' disabled' : '') +
-              ' title="' + STAT_DESC[k] + '">' + (max ? '已達上限' : '+' + C.STAT_STEP + '<small>' + cost + ' 經驗</small>') +
-              '</button></td></tr>';
-          }).join('') +
-          '</tbody></table>' +
-          '<p class="hint">士兵的等級與技能在「營舍」裡各自提升</p>' +
-        '</div>' +
-        renderEquipBox() +
-      '</div>' +
-      '<div class="camp-foot"><button id="btn-reset" class="danger">重新建立武將</button></div>';
-
-    preview();
+      '</div>';
   }
 
   campEl.addEventListener('click', function (e) {
@@ -514,7 +548,13 @@
     var b = e.target.closest('button') || e.target.closest('[data-pick]');
     if (!b || b.disabled) return;
     var d = b.dataset, C2 = C;
-    if (d.diff) {
+    if (d.tab) {
+      if (d.tab === campTab) return;
+      campTab = d.tab;
+      try { localStorage.setItem('sango.campTab', campTab); } catch (err) { /* 存不了就算了 */ }
+      campMsg = '';
+      sfx('click');
+    } else if (d.diff) {
       if (!diffUnlocked(d.diff) || d.diff === diffKey()) return;
       profile.difficulty = d.diff;
       stageIdx = Math.min(clr(), S.STAGES.length - 1);

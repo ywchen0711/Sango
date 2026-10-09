@@ -150,7 +150,7 @@ button small { color: var(--muted); margin-left: 4px; font-size: 12px; }
 
 @media (max-width: 600px) {
   .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .camp-cols { grid-template-columns: 1fr; }
+  .camp-cols { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---- 計策列 ---- */
@@ -367,3 +367,17 @@ button.explore:hover:not(:disabled) { background: #3a6a9a; }
 .set-status .on { color: #40d040; font-weight: bold; }
 .result .loot { display: flex; flex-direction: column; gap: 4px; text-align: left;
                 width: 100%; max-width: 640px; padding: 6px 10px; border: 1px solid #3a3a4a; border-radius: 6px; }
+
+/* ---- 營地分頁 ---- */
+.camp-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 2px solid #3a3a4a; margin: 4px 0 10px; }
+.camp-tabs button { border-radius: 6px 6px 0 0; border-bottom: none; padding: 8px 16px; font-size: 15px; background: #22222c; color: var(--muted); position: relative; top: 2px; }
+.camp-tabs button.on { background: #2e2e3c; color: #f8d838; border-color: #f8d838; border-bottom: 2px solid #2e2e3c; font-weight: bold; }
+.camp-tabs .badge { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: #4a4a5a; color: #e0e0e8; font-size: 11px; line-height: 18px; text-align: center; }
+.camp-tabs .badge.hot { background: #d04030; color: #fff; }
+.camp-page { display: flex; flex-direction: column; gap: 10px; }
+.camp-page > *, .camp-cols > * { min-width: 0; }
+.camp-tabs { max-width: 100%; }
+@media (max-width: 640px) {
+  .camp-tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .camp-tabs button { padding: 7px 10px; font-size: 14px; white-space: nowrap; flex: 0 0 auto; }
+}

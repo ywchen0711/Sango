@@ -22,6 +22,7 @@
   var armies = S.DEFAULT_ARMIES.map(function (a) { return Object.assign({}, a, { units: a.units.slice() }); });
   var levels = null;
   var explore = null;             // 探索模式的地圖 (S.makeExplore)；一般戰鬥為 null
+  var extra = {};                 // 其他戰鬥參數：eliteChance (敵兵成為精英的機率)、ilvl (掉落的物品等級)
   var battle, running = false, speed = 1, last = 0, acc = 0, tableT = 0;
   var active = false;             // 正式出征中 (營地預覽時為 false：不能下令、不能開始)
   var overFired = false;
@@ -36,7 +37,8 @@
 
   function newBattle() {
     battle = S.currentBattle = new S.Battle(armies, { control: [true, false], autoTactics: [chkAutoTac.checked, false],
-                                                      levels: levels, explore: explore });   // S.currentBattle：方便在主控台除錯
+                                                      levels: levels, explore: explore,
+                                                      eliteChance: extra.eliteChance, ilvl: extra.ilvl });   // S.currentBattle：方便在主控台除錯
     running = false;
     overFired = false;
     acc = 0;
@@ -423,15 +425,17 @@
     onSettings: null,             // 速度 / 兵力條改變
     // 布陣預覽：armies = [我軍, 敵軍]，lv = [我軍等級, 敵軍等級]
     // ex：探索模式的地圖 (S.makeExplore)，一般戰鬥省略
-    setup: function (newArmies, lv, ex) {
+    setup: function (newArmies, lv, ex, opts) {
       armies = newArmies;
       levels = lv;
       explore = ex || null;
+      extra = opts || {};
       active = false;
       newBattle();
     },
     // 探索模式途中撿到的裝備
     getLoot: function () { return (battle && battle.lootFound) || []; },
+    getExpBonus: function () { return (battle && battle.expBonus) || 0; },   // 經驗壇
     isExplore: function () { return !!explore; },
     // 正式開戰
     start: function () {

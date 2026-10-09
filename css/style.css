@@ -249,6 +249,13 @@ canvas.pointer { cursor: pointer; }
 .camp-head .plus { color: #80e0ff; margin-left: 2px; }
 @media (max-width: 600px) { .equip-slots { grid-template-columns: 1fr; } }
 
+/* ---- 難度 ---- */
+.diffs { display: flex; gap: 6px; flex-wrap: wrap; }
+.diffs .diff { color: var(--dc); border-color: var(--dc); background: transparent; padding: 5px 14px; }
+.diffs .diff small { color: var(--muted); }
+.diffs .diff.selected { background: var(--dc); color: #1c1c24; font-weight: bold; }
+.diffs .diff.selected small { color: #1c1c24; }
+
 /* ---- 出征 / 探索 ---- */
 .go-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; max-width: 330px; }
 .go-btns small { flex-basis: 100%; text-align: right; color: var(--muted); margin: 0; }

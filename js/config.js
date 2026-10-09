@@ -230,7 +230,7 @@ window.Sango = window.Sango || {};
     SELL_RATE: 0.5,
     STAT_COST: 100,                // 主將能力 +STAT_STEP 需要的經驗值
     STAT_STEP: 3,
-    STAT_MAX: 100,
+    STAT_MAX: 150,
     LEVEL_COST: 100,               // 兵種升一級需要的經驗值
     REPLAY_RATE: 0.5,              // 重打已過關卡的獎勵倍率
     LOSS_EXP_RATE: 0.3             // 戰敗仍可獲得的經驗值比例 (沒有金錢)
@@ -238,7 +238,10 @@ window.Sango = window.Sango || {};
   S.STAT_NAMES = { hp: '體力', war: '武力', int: '智力', lead: '統率' };
   S.STAT_KEYS = ['hp', 'war', 'int', 'lead'];
   // 兵種等級：每級該兵種 HP / MP / 攻擊 / 防禦 / 智力 / 精神 +BONUS
-  S.LEVEL = { BONUS: 0.05, MAX: 20 };
+  S.LEVEL = { BONUS: 0.05, MAX: 40 };
+  // 升級費用遞增：前期都是 100 經驗，越高越貴 (噩夢 / 地獄的經驗值倍率很高，避免一下子升太多)
+  S.levelCost = function (lv) { return S.CAMPAIGN.LEVEL_COST + 25 * Math.max(0, lv - 5); };   // Lv5 以前都是 100
+  S.statCost = function (v) { return S.CAMPAIGN.STAT_COST + Math.max(0, v - 75) * 6; };       // 75 以前都是 100
 
   // ---- 裝備 (品質、詞綴、套裝、暗金的資料與邏輯在 js/items.js) ----
   S.EQUIP_SLOTS = { weapon: '武器', armor: '防具', treasure: '寶物' };
@@ -247,10 +250,25 @@ window.Sango = window.Sango || {};
   // 關卡：general 敵將能力，units 敵軍士兵，gold / exp 首次過關獎勵
   // drops 首次過關額外獲得的裝備：{ quality: 'rare' } 隨機稀有、{ unique: id } 暗金、{ set: id } 套裝 (見 js/items.js)
   // lv 敵軍等級：數字 = 全體同等級；也可以分別指定 { general, spear, archer, cavalry }
-  S.stageLevels = function (st) {
-    if (typeof st.lv === 'object') return Object.assign({ general: 0, spear: 0, archer: 0, cavalry: 0 }, st.lv);
-    return { general: st.lv, spear: st.lv, archer: st.lv, cavalry: st.lv };
+  // diff：難度 (S.DIFFICULTIES 的 key)，敵軍全體再加上該難度的等級
+  S.stageLevels = function (st, diff) {
+    var lv = typeof st.lv === 'object' ? Object.assign({ general: 0, spear: 0, archer: 0, cavalry: 0 }, st.lv) :
+      { general: st.lv, spear: st.lv, archer: st.lv, cavalry: st.lv };
+    var D = diff ? S.DIFFICULTIES[diff] : null;
+    var bonus = D ? D.lv + Math.round(D.perStage * Math.max(0, S.STAGES.indexOf(st))) : 0;   // 越後面的關卡加越多
+    Object.keys(lv).forEach(function (k) { lv[k] += bonus; });
+    return lv;
   };
+
+  // ---- 難度 (仿暗黑破壞神 2)：全破普通 10 關解鎖噩夢，全破噩夢解鎖地獄 ----
+  // lv：敵軍全體等級加成 (再加上 perStage × 關卡序號)  ilvl：掉落物品等級加成  reward：金錢 / 經驗倍率
+  // elite：一般出征時每隊敵兵成為精英的機率  campElite：探索模式每座敵營有精英的機率
+  S.DIFFICULTIES = {
+    normal:    { name: '普通', lv: 0,  perStage: 0,   ilvl: 0,  reward: 1,   elite: 0.05, campElite: 0.5,  color: '#e8e8f0' },
+    nightmare: { name: '噩夢', lv: 5,  perStage: 0.4, ilvl: 10, reward: 2.5, elite: 0.15, campElite: 0.75, color: '#ff9040' },
+    hell:      { name: '地獄', lv: 10, perStage: 0.8, ilvl: 20, reward: 5,   elite: 0.25, campElite: 1,    color: '#ff4040' }
+  };
+  S.DIFFICULTY_KEYS = ['normal', 'nightmare', 'hell'];
   S.STAGES = [
     { title: '黃巾之亂', general: { name: '程遠志', hp: 45, war: 52, int: 20, lead: 30, beard: '#403020' },
       units: ['spear', 'spear', 'archer', 'archer'], lv: 0, gold: 120, exp: 100 },
@@ -261,17 +279,17 @@ window.Sango = window.Sango || {};
     { title: '壽春討伐', general: { name: '紀靈', hp: 75, war: 82, int: 42, lead: 70, beard: null },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 180, exp: 250 },
     { title: '白馬之圍', general: { name: '顏良', hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, cavalry: 1 }, gold: 200, exp: 300, drops: [{ unique: 'dilu' }] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1 }, gold: 200, exp: 300, drops: [{ unique: 'dilu' }] },
     { title: '延津之戰', general: { name: '文醜', hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 2 }, gold: 220, exp: 350, drops: [{ unique: 'warDrum' }] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 220, exp: 350, drops: [{ unique: 'warDrum' }] },
     { title: '合肥之戰', general: { name: '張遼', hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
       units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 2, cavalry: 2 }, gold: 240, exp: 400 },
     { title: '博望坡', general: { name: '夏侯惇', hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 3, archer: 2, cavalry: 3 }, gold: 260, exp: 450, drops: [{ unique: 'qinggang' }] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 2, cavalry: 3 }, gold: 260, exp: 450, drops: [{ unique: 'qinggang' }] },
     { title: '樊城之戰', general: { name: '關羽', hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 4, archer: 3, cavalry: 4 }, gold: 300, exp: 500, drops: [{ set: 'dragonBlade' }] },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 3 }, gold: 300, exp: 500, drops: [{ set: 'dragonBlade' }] },
     { title: '虎牢關', general: { name: '呂布', hp: 98, war: 100, int: 26, lead: 85, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 6, spear: 6, archer: 5, cavalry: 6 }, gold: 500, exp: 600, drops: [{ set: 'halberd' }, { set: 'redHare' }] }
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 5, archer: 4, cavalry: 5 }, gold: 500, exp: 600, drops: [{ set: 'halberd' }, { set: 'redHare' }] }
   ];
 
   // ---- 雙方軍隊 (hp=體力 war=武力 int=智力 lead=統率；統率提升士兵防禦) ----

@@ -22,12 +22,14 @@
     CAMP_SIZE: [3, 6],        // 每座敵營的士兵數 (會隨關卡增加)
     CHESTS: 14,               // 寶箱數 (其中 LOOT_CHESTS 個是裝備箱)
     LOOT_CHESTS: 5,
+    SHRINES: 5,               // 神壇數 (見 elites.js)
     REWARD_MULT: 2            // 過關的金錢 / 經驗為一般出征的幾倍
   };
 
   // 產生探索地圖：回傳 { cols, rows, map, start, spawns, chests, boss, ilvl, stage }
-  S.makeExplore = function (stageIdx, rng) {
+  S.makeExplore = function (stageIdx, rng, diff) {
     rng = rng || S.random;
+    var D = S.DIFFICULTIES[diff || 'normal'];
     var E = S.EXPLORE, W = E.COLS, H = E.ROWS, st = S.STAGES[stageIdx];
     var grid = [];
     var x, y, i;
@@ -130,10 +132,15 @@
     var sizeBonus = Math.floor(stageIdx / 4);
     centers.forEach(function (c, j) {
       var n = ri(E.CAMP_SIZE[0], E.CAMP_SIZE[1]) + sizeBonus;
-      freeAround(c.x, c.y, n).forEach(function (cell) {
-        spawns.push({ type: st.units[Math.floor(rng() * st.units.length)], x: cell.x, y: cell.y, camp: j + 1 });
+      var hasElite = rng() < D.campElite;   // 每座敵營依難度有機率由一隊精英領頭
+      freeAround(c.x, c.y, n).forEach(function (cell, k) {
+        spawns.push({ type: st.units[Math.floor(rng() * st.units.length)], x: cell.x, y: cell.y, camp: j + 1,
+                      elite: hasElite && k === 0 ? S.rollEliteAffixes(rng) : null });
       });
     });
+    // 敵將據點：噩夢以上有精英護衛
+    if (D.lv > 0) spawns.filter(function (sp) { return sp.camp === 0 && sp.type !== 'general'; }).slice(0, D.lv >= 12 ? 2 : 1)
+      .forEach(function (sp) { sp.elite = S.rollEliteAffixes(rng); });
 
     // 寶箱：遠離起點，前 LOOT_CHESTS 個是裝備箱
     var chests = [];
@@ -145,12 +152,22 @@
       chests.push({ x: q2.x, y: q2.y, loot: chests.length < E.LOOT_CHESTS });
     }
 
+    // 神壇：分散在地圖各處，每種一座 (最多 SHRINES 座)
+    var shrines = [], kinds = S.pickDistinct(S.SHRINE_KEYS, E.SHRINES, rng);
+    for (tries = 0; tries < 4000 && shrines.length < kinds.length; tries++) {
+      var q3 = floor[Math.floor(rng() * floor.length)];
+      if (used[key(q3.x, q3.y)] || cheb(q3.x, q3.y, start.x, start.y) < 15) continue;
+      if (shrines.some(function (c) { return cheb(c.x, c.y, q3.x, q3.y) < 18; })) continue;
+      used[key(q3.x, q3.y)] = true;
+      shrines.push({ x: q3.x, y: q3.y, type: kinds[shrines.length] });
+    }
+
     // 我軍起點
     used[key(start.x, start.y)] = false;
     var startCells = freeAround(start.x, start.y, 12);
 
     return {
-      cols: W, rows: H, stage: stageIdx, ilvl: stageIdx + 1,
+      cols: W, rows: H, stage: stageIdx, ilvl: stageIdx + 1 + D.ilvl, diff: diff || 'normal', shrines: shrines,
       map: grid.map(function (row) { return row.map(function (w) { return w ? '#' : '.'; }).join(''); }),
       start: start, startCells: startCells, spawns: spawns, chests: chests, boss: boss, camps: centers.length + 1
     };

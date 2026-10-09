@@ -207,6 +207,11 @@
       g.fillStyle = c.loot ? '#f8a030' : '#f8d838';
       g.fillRect(mx + c.x * s - 0.5, my + c.y * s - 0.5, 1.5, 1.5);
     });
+    (battle.shrines || []).forEach(function (sh) {
+      if (sh.used || !battle.seen[sh.y * W + sh.x]) return;
+      g.fillStyle = S.SHRINES[sh.type].color;
+      g.fillRect(mx + sh.x * s - 1, my + sh.y * s - 1, 2, 2);
+    });
     var boss = battle.explore.boss;
     if (battle.seen[boss.y * W + boss.x] && battle.generalAlive(1)) this.text('★', mx + boss.x * s, my + boss.y * s, 6, '#ff5040', 'center', '#000');
     battle.units.forEach(function (u) {
@@ -269,6 +274,20 @@
       g.lineTo(u.chestGoal.x * T + 8, u.chestGoal.y * T + 9);
       g.stroke();
       g.setLineDash([]);
+    });
+    (battle.shrines || []).forEach(function (sh) {
+      if (!battle.seen[sh.y * battle.cols + sh.x]) return;
+      var def = S.SHRINES[sh.type], x = sh.x * T, y = sh.y * T;
+      g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x + 2, y + 13, 12, 2);
+      g.fillStyle = '#707070'; g.fillRect(x + 3, y + 9, 10, 5);
+      g.fillStyle = '#a0a0a0'; g.fillRect(x + 4, y + 7, 8, 3);
+      if (sh.used) return;
+      var f = Math.sin(battle.time * 8 + sh.x) * 1.2;
+      g.fillStyle = def.color; g.globalAlpha = 0.35;
+      g.beginPath(); g.arc(x + 8, y + 4, 6, 0, Math.PI * 2); g.fill();
+      g.globalAlpha = 1;
+      g.beginPath(); g.ellipse(x + 8, y + 3.5 + f * 0.3, 2.5, 4 + f * 0.4, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#ffffff'; g.fillRect(x + 7.5, y + 3, 1, 3);
     });
     battle.chests.forEach(function (c) {
       if (battle.explore && !battle.seen[c.y * battle.cols + c.x]) return;
@@ -381,6 +400,10 @@
     if (frame && u.type !== 'cavalry' && u.type !== 'general') y -= 1;
     x = Math.round(x); y = Math.round(y);
 
+    if (u.elite && !u.dead) {     // 精英：腳下閃動的紫色光環
+      g.fillStyle = 'rgba(200,110,255,' + (0.35 + 0.2 * Math.sin(time * 5)) + ')';
+      g.beginPath(); g.ellipse(x + 8, y + 14, 9, 3.5, 0, 0, Math.PI * 2); g.fill();
+    }
     var set = this.sprites[u.side][u.type];
     var img = (u.flashT > 0 || u.dead) ? set.flash[frame] : set.frames[frame];
     if (u.facing < 0) {
@@ -403,6 +426,7 @@
       g.fillRect(x + 2, y + 16.5, 12 * u.mp / u.maxMp, 1);
     }
     this.drawStatus(u, x, y, time);
+    if (u.elite) this.text(u.name, x + 8, y - 4, 4.5, '#e0a0ff', 'center', '#000');
     if (u.id === this.highlightId) {
       g.strokeStyle = '#f8f040';
       g.lineWidth = 1;

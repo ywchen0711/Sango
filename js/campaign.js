@@ -63,6 +63,8 @@
       profile.gold = Number(profile.gold) || 0;
       profile.exp = Number(profile.exp) || 0;
       profile.cleared = Math.min(S.STAGES.length, Number(profile.cleared) || 0);
+      profile.clearedBy = Object.assign({ normal: profile.cleared, nightmare: 0, hell: 0 }, profile.clearedBy);
+      if (!diffUnlocked(profile.difficulty)) profile.difficulty = 'normal';
       profile.items = (profile.items || []).map(S.normalizeItem).filter(Boolean);
       var eq = profile.equip || {};
       profile.equip = {};
@@ -73,7 +75,7 @@
       profile.shop = (profile.shop || []).map(S.normalizeItem).filter(Boolean);
       if (!profile.shop.length) restock();
       S.game.applySettings(profile.settings);
-      stageIdx = Math.min(profile.cleared, S.STAGES.length - 1);
+      stageIdx = Math.min(clr(), S.STAGES.length - 1);
       campMsg = '';
       renderCamp();
     }).catch(function (err) {
@@ -169,6 +171,8 @@
         gold: C.START_GOLD,
         exp: 0,
         cleared: 0,
+        clearedBy: { normal: 0, nightmare: 0, hell: 0 },
+        difficulty: 'normal',
         stats: { wins: 0, losses: 0 },
         settings: S.game.getSettings()
       };
@@ -183,22 +187,39 @@
   }
 
   // ======================= 營地 =======================
+  // ======================= 難度 =======================
+  // profile.clearedBy[難度] = 該難度已通過的關卡數；profile.cleared 保留普通難度的進度 (舊版相容)
+  function diffKey() { return profile.difficulty || 'normal'; }
+  function D() { return S.DIFFICULTIES[diffKey()]; }
+  function clr() { return profile.clearedBy[diffKey()] || 0; }
+  function setClr(n) {
+    profile.clearedBy[diffKey()] = n;
+    if (diffKey() === 'normal') profile.cleared = n;
+  }
+  function diffUnlocked(k) {
+    var i = S.DIFFICULTY_KEYS.indexOf(k);
+    if (i <= 0) return i === 0;
+    return (profile.clearedBy[S.DIFFICULTY_KEYS[i - 1]] || 0) >= S.STAGES.length;
+  }
+  function stageIlvl(i) { return Math.min(S.MAX_ILVL, i + 1 + D().ilvl); }
+  function battleOpts(i) { return { eliteChance: D().elite, ilvl: stageIlvl(i) }; }
+
   function playerArmy() { return S.playerArmy(profile); }
   function playerLevels() { return S.playerLevels(profile); }
   function enemyArmy(st) {
     return Object.assign({}, st.general, { units: st.units.slice() });
   }
   function levelText(st) {
-    var lv = S.stageLevels(st);
+    var lv = S.stageLevels(st, diffKey());
     var vals = ['general', 'spear', 'archer', 'cavalry'].map(function (k) { return lv[k]; });
     if (vals.every(function (v) { return v === vals[0]; })) return vals[0] ? 'Lv' + vals[0] : '';
     return '主將Lv' + lv.general + ' 槍Lv' + lv.spear + ' 弓Lv' + lv.archer + ' 騎Lv' + lv.cavalry;
   }
-  function stageLabel(i) { return '第 ' + (i + 1) + ' 關 ' + S.STAGES[i].title; }
+  function stageLabel(i) { return (diffKey() === 'normal' ? '' : '【' + D().name + '】') + '第 ' + (i + 1) + ' 關 ' + S.STAGES[i].title; }
 
   // ======================= 裝備 =======================
   var SHOP_SIZE = 6;
-  function shopLevel() { return Math.min(S.STAGES.length, profile.cleared + 1); }
+  function shopLevel() { return Math.min(S.MAX_ILVL, clr() + 1 + D().ilvl); }
   function restock() { profile.shop = S.rollShop(shopLevel(), SHOP_SIZE); }
 
   function itemName(item) {
@@ -273,15 +294,15 @@
 
   function preview() {
     var st = S.STAGES[stageIdx];
-    S.game.setup([playerArmy(), enemyArmy(st)], [playerLevels(), S.stageLevels(st)]);
+    S.game.setup([playerArmy(), enemyArmy(st)], [playerLevels(), S.stageLevels(st, diffKey())], null, battleOpts(stageIdx));
     S.game.setCaption({ title: stageLabel(stageIdx), sub: 'vs ' + st.general.name + '　按「出征」開戰' });
   }
 
   function renderCamp() {
     show('camp');
     var g = profile.general, st = S.STAGES[stageIdx];
-    var first = stageIdx >= profile.cleared;
-    var rate = first ? 1 : C.REPLAY_RATE;
+    var first = stageIdx >= clr();
+    var rate = (first ? 1 : C.REPLAY_RATE) * D().reward;
     var count = { spear: 0, archer: 0, cavalry: 0 };
     profile.soldiers.forEach(function (t) { count[t]++; });
     var full = profile.soldiers.length >= C.MAX_UNITS;
@@ -299,12 +320,20 @@
       '</div>' +
       (campMsg ? '<p class="msg">' + esc(campMsg) + '</p>' : '') +
 
-      '<h3>關卡 <small>已通過 ' + profile.cleared + ' / ' + S.STAGES.length + '</small></h3>' +
+      '<div class="diffs">' + S.DIFFICULTY_KEYS.map(function (k, i) {
+        var dd = S.DIFFICULTIES[k], open = diffUnlocked(k);
+        return '<button class="diff' + (k === diffKey() ? ' selected' : '') + '" data-diff="' + k + '"' + (open ? '' : ' disabled') +
+          ' style="--dc:' + dd.color + '" title="' + (open ? '敵軍 +' + dd.lv + ' 級、物品等級 +' + dd.ilvl + '、獎勵 ×' + dd.reward :
+          '全破' + S.DIFFICULTIES[S.DIFFICULTY_KEYS[i - 1]].name + '難度後解鎖') + '">' +
+          (open ? '' : '🔒 ') + dd.name + '<small>' + (profile.clearedBy[k] || 0) + '/' + S.STAGES.length + '</small></button>';
+      }).join('') + '</div>' +
+      '<h3>關卡 <small>' + D().name + '難度　已通過 ' + clr() + ' / ' + S.STAGES.length +
+        (D().lv ? '　敵軍 +' + D().lv + ' 級・獎勵 ×' + D().reward : '') + '</small></h3>' +
       '<div class="stages">' + S.STAGES.map(function (s, i) {
-        var locked = i > profile.cleared;
-        var cls = 'stage' + (i < profile.cleared ? ' cleared' : '') + (i === stageIdx ? ' selected' : '');
+        var locked = i > clr();
+        var cls = 'stage' + (i < clr() ? ' cleared' : '') + (i === stageIdx ? ' selected' : '');
         return '<button class="' + cls + '" data-stage="' + i + '"' + (locked ? ' disabled' : '') + '>' +
-          (locked ? '🔒 ' : i < profile.cleared ? '✔ ' : '') + (i + 1) + '. ' + s.title +
+          (locked ? '🔒 ' : i < clr() ? '✔ ' : '') + (i + 1) + '. ' + s.title +
           '<small>' + s.general.name + '</small></button>';
       }).join('') + '</div>' +
       '<div class="stage-info">' +
@@ -343,18 +372,18 @@
         '<div class="box"><h3>能力提升 <small>用經驗值</small></h3>' +
           '<table class="ups"><tbody>' +
           S.STAT_KEYS.map(function (k) {
-            var max = g[k] >= C.STAT_MAX;
+            var max = g[k] >= C.STAT_MAX, cost = S.statCost(g[k]);
             return '<tr><th>' + S.STAT_NAMES[k] + '</th><td>' + g[k] + '</td><td>' +
-              '<button data-up="' + k + '"' + (max || profile.exp < C.STAT_COST ? ' disabled' : '') +
-              ' title="' + STAT_DESC[k] + '">' + (max ? '已達上限' : '+' + C.STAT_STEP + '<small>' + C.STAT_COST + ' 經驗</small>') +
+              '<button data-up="' + k + '"' + (max || profile.exp < cost ? ' disabled' : '') +
+              ' title="' + STAT_DESC[k] + '">' + (max ? '已達上限' : '+' + C.STAT_STEP + '<small>' + cost + ' 經驗</small>') +
               '</button></td></tr>';
           }).join('') +
           S.UNIT_KINDS.map(function (t) {
-            var lv = profile.levels[t], max = lv >= S.LEVEL.MAX;
+            var lv = profile.levels[t], max = lv >= S.LEVEL.MAX, cost = S.levelCost(lv);
             return '<tr><th>' + unitName(t) + '</th><td>Lv' + lv + '</td><td>' +
-              '<button data-lv="' + t + '"' + (max || profile.exp < C.LEVEL_COST ? ' disabled' : '') +
+              '<button data-lv="' + t + '"' + (max || profile.exp < cost ? ' disabled' : '') +
               ' title="全部' + unitName(t) + '能力 +' + Math.round(S.LEVEL.BONUS * 100) + '%">' +
-              (max ? '已達上限' : 'Lv▲<small>' + C.LEVEL_COST + ' 經驗</small>') + '</button></td></tr>';
+              (max ? '已達上限' : 'Lv▲<small>' + cost + ' 經驗</small>') + '</button></td></tr>';
           }).join('') +
           '</tbody></table>' +
         '</div>' +
@@ -370,7 +399,14 @@
     var b = e.target.closest('button');
     if (!b || b.disabled) return;
     var d = b.dataset, C2 = C;
-    if (d.stage != null) {
+    if (d.diff) {
+      if (!diffUnlocked(d.diff) || d.diff === diffKey()) return;
+      profile.difficulty = d.diff;
+      stageIdx = Math.min(clr(), S.STAGES.length - 1);
+      restock();
+      campMsg = '切換到' + D().name + '難度：敵軍 +' + D().lv + ' 級，掉落的物品等級 +' + D().ilvl + '，獎勵 ×' + D().reward;
+      save();
+    } else if (d.stage != null) {
       stageIdx = Number(d.stage);
       campMsg = '';
     } else if (d.buy) {
@@ -389,14 +425,16 @@
       campMsg = '賣掉一隊' + unitName(t) + '，獲得 ' + refund + ' 金';
       save();
     } else if (d.up) {
-      if (profile.exp < C2.STAT_COST || profile.general[d.up] >= C2.STAT_MAX) return;
-      profile.exp -= C2.STAT_COST;
+      var sc = S.statCost(profile.general[d.up]);
+      if (profile.exp < sc || profile.general[d.up] >= C2.STAT_MAX) return;
+      profile.exp -= sc;
       profile.general[d.up] = Math.min(C2.STAT_MAX, profile.general[d.up] + C2.STAT_STEP);
       campMsg = S.STAT_NAMES[d.up] + ' 提升到 ' + profile.general[d.up];
       save();
     } else if (d.lv) {
-      if (profile.exp < C2.LEVEL_COST || profile.levels[d.lv] >= S.LEVEL.MAX) return;
-      profile.exp -= C2.LEVEL_COST;
+      var lc = S.levelCost(profile.levels[d.lv]);
+      if (profile.exp < lc || profile.levels[d.lv] >= S.LEVEL.MAX) return;
+      profile.exp -= lc;
       profile.levels[d.lv]++;
       campMsg = unitName(d.lv) + ' 升到 Lv' + profile.levels[d.lv];
       save();
@@ -453,7 +491,8 @@
   function startExplore() {
     var st = S.STAGES[stageIdx];
     exploring = true;
-    S.game.setup([playerArmy(), enemyArmy(st)], [playerLevels(), S.stageLevels(st)], S.makeExplore(stageIdx));
+    S.game.setup([playerArmy(), enemyArmy(st)], [playerLevels(), S.stageLevels(st, diffKey())],
+                 S.makeExplore(stageIdx, null, diffKey()), battleOpts(stageIdx));
     S.game.setCaption(null);
     startBattle();
   }
@@ -487,35 +526,40 @@
     if (!profile || view !== 'battle') return;
     S.game.stop();                // 收起暫停 / 撤退與計策列，戰場停在結束畫面
     var st = S.STAGES[stageIdx];
-    var first = stageIdx >= profile.cleared;
+    var first = stageIdx >= clr();
     var win = winner === 0;
     var gold = 0, exp, note;
-    var mult = exploring ? S.EXPLORE.REWARD_MULT : 1;
+    var mult = (exploring ? S.EXPLORE.REWARD_MULT : 1) * D().reward;
+    var expBonus = S.game.getExpBonus();   // 經驗壇
     if (win) {
       var rate = (first ? 1 : C.REPLAY_RATE) * mult;
       gold = Math.round(st.gold * rate);
-      exp = Math.round(st.exp * rate);
-      note = (first ? '首次過關' : '重打獎勵 ' + Math.round(C.REPLAY_RATE * 100) + '%') + (exploring ? '・探索 ×' + mult : '');
+      exp = Math.round(st.exp * rate * (1 + expBonus));
+      note = (first ? '首次過關' : '重打獎勵 ' + Math.round(C.REPLAY_RATE * 100) + '%') + (exploring ? '・探索 ×' + S.EXPLORE.REWARD_MULT : '') +
+        (D().reward > 1 ? '・' + D().name + ' ×' + D().reward : '') + (expBonus ? '・經驗壇 +' + Math.round(expBonus * 100) + '%' : '');
       profile.stats.wins++;
-      if (first) profile.cleared = stageIdx + 1;
+      if (first) setClr(stageIdx + 1);
     } else {
-      exp = Math.round(st.exp * C.LOSS_EXP_RATE);
+      exp = Math.round(st.exp * C.LOSS_EXP_RATE * D().reward * (1 + expBonus));
       note = (winner < 0 ? '平手視為未過關' : '戰敗') + '，仍獲得部分經驗';
       profile.stats.losses++;
     }
     profile.gold += gold;
     profile.exp += exp;
     // 戰利品：一般出征打贏掉落一件隨機裝備；探索模式是途中撿到的裝備 (輸了也能帶走)；首次過關另有關卡指定的裝備
-    var loot = exploring ? S.game.getLoot().slice() : win ? [S.rollLoot(stageIdx + 1)] : [];
-    if (win && first) (st.drops || []).forEach(function (dr) { loot.push(S.makeItem(Object.assign({ ilvl: stageIdx + 1 }, dr))); });
+    // 一般出征：打贏才拿得到 (含精英掉落)；探索模式：撿到的都能帶走
+    var loot = exploring ? S.game.getLoot().slice() : win ? [S.rollLoot(stageIlvl(stageIdx))].concat(S.game.getLoot()) : [];
+    if (win && first) (st.drops || []).forEach(function (dr) { loot.push(S.makeItem(Object.assign({ ilvl: stageIlvl(stageIdx) }, dr))); });
     var lootNotes = loot.map(gainItem);
     restock();
     save();
 
     var unlock = '';
     if (win && first) {
-      unlock = profile.cleared >= S.STAGES.length ? '🏆 恭喜！全部 ' + S.STAGES.length + ' 關制霸天下！' :
-        '🔓 解鎖' + stageLabel(profile.cleared);
+      var nextDiff = S.DIFFICULTY_KEYS[S.DIFFICULTY_KEYS.indexOf(diffKey()) + 1];
+      unlock = clr() < S.STAGES.length ? '🔓 解鎖' + stageLabel(clr()) :
+        nextDiff ? '🏆 ' + D().name + '難度制霸！🔓 解鎖' + S.DIFFICULTIES[nextDiff].name + '難度：敵人更強，掉落更好的裝備' :
+        '🏆 恭喜！地獄難度全部制霸，天下無敵！';
     }
     show('result');
     resultEl.innerHTML =
@@ -531,7 +575,7 @@
       '<button id="btn-again">再戰一次</button></div>';
     document.getElementById('btn-camp').addEventListener('click', function () {
       S.game.stop();
-      if (win && first && profile.cleared < S.STAGES.length) stageIdx = profile.cleared;
+      if (win && first && clr() < S.STAGES.length) stageIdx = clr();
       campMsg = '';
       renderCamp();
     });

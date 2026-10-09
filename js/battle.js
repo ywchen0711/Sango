@@ -140,6 +140,8 @@
     this.cols = this.map[0].length;
     this.rows = this.map.length;
     this.timeLimit = this.explore ? Infinity : S.TIME_LIMIT;
+    this.ilvl = opts.ilvl || (this.explore && this.explore.ilvl) || 1;   // 精英、神壇掉落的物品等級
+    this.lootFound = [];          // 這場戰鬥撿到的裝備 (精英掉落、探索的寶箱 / 敵營 / 神壇)
     this.initEvents(opts);
     this.walls = new Array(this.cols * this.rows);
     this.occ = new Array(this.cols * this.rows);
@@ -151,6 +153,7 @@
     }
     if (this.explore) this.deployExplore();
     else { this.deploy(0); this.deploy(1); }
+    if (opts.eliteChance && !this.explore) this.rollElites(opts.eliteChance);   // 一般出征：敵兵依機率成為精英
     this.order = this.units.map(function (u, i) { return i; });
   }
 
@@ -173,11 +176,12 @@
       u.camp = sp.camp;
       u.awake = false;
       u.engaged = true;
+      if (sp.elite) self.makeElite(u, sp.elite);
     });
+    this.shrines = (ex.shrines || []).map(function (sh) { return { x: sh.x, y: sh.y, type: sh.type, used: false }; });
     this.units.forEach(function (u) { if (u.side === 0) u.awake = true; });
     this.campLeft = {};
     this.units.forEach(function (u) { if (u.side === 1) self.campLeft[u.camp] = (self.campLeft[u.camp] || 0) + 1; });
-    this.lootFound = [];          // 這次探索撿到的裝備 (結束時交給 campaign.js)
     this.campsCleared = 0;
     this.chests = ex.chests.map(function (c, i) {
       return { id: i, x: c.x, y: c.y, loot: c.loot, item: c.loot ? 'loot' : null, open: true, born: 0 };
@@ -425,6 +429,8 @@
         u.fromX = u.x; u.fromY = u.y; u.moveT = u.moveDur = 0;
         var chest = this.chestAt(u.x, u.y);
         if (chest) this.openChest(u, chest);
+        var shrine = this.shrines && this.shrineAt(u.x, u.y);
+        if (shrine) this.touchShrine(u, shrine);
       }
       return;
     }
@@ -446,6 +452,7 @@
       enemies = this.exploreThink(u);
       if (!enemies) return;
     }
+    if (u.elite) this.eliteThink(u, enemies);
 
     // 玩家手動下令的主將 (移動 / 攻擊 / 固守，見 tactics.js)
     if (u.order) { this.followOrder(u, enemies); return; }
@@ -743,7 +750,9 @@
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
       for (var h = 0; h < (sk.hits || 1) && !t.dead; h++) {
-        this.applyDamage(t, this.calcDamage(u, t, hit.magic, power, sk.ignoreDef || 0), hit.magic ? '#e0b0ff' : null);
+        var dmg = this.calcDamage(u, t, hit.magic, power, sk.ignoreDef || 0);
+        this.applyDamage(t, dmg, hit.magic ? '#e0b0ff' : null);
+        if (u.elite) this.eliteOnHit(u, dmg);
       }
       if (t.dead) continue;
       if (sk.debuff) {
@@ -864,6 +873,7 @@
     } else {
       this.log.push(this.time.toFixed(1) + 's ' + army.name + '軍 ' + e.name + ' 潰滅');
     }
+    if (e.elite) this.eliteOnKill(e);
     if (this.explore && e.side === 1 && e.camp > 0) this.checkCampCleared(e.camp, e);
     this.checkVictory();
   };

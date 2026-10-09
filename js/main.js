@@ -468,16 +468,40 @@
   document.addEventListener('keyup', function (e) {
     if (WALK_KEYS[e.code] && held[e.code]) { delete held[e.code]; applyWalk(); }
   });
-  // 觸控裝置的螢幕方向鍵
-  Array.prototype.forEach.call(document.querySelectorAll('[data-walk]'), function (b) {
-    var d = b.dataset.walk.split(',').map(Number), id = 'pad' + b.dataset.walk;
-    function down(e) { e.preventDefault(); held[id] = d; applyWalk(); }
-    function up(e) { e.preventDefault(); delete held[id]; applyWalk(); }
-    b.addEventListener('pointerdown', down);
-    b.addEventListener('pointerup', up);
-    b.addEventListener('pointerleave', up);
-    b.addEventListener('pointercancel', up);
+  // 觸控裝置的方向搖桿 (疊在戰場左下角)：手指在圓盤上的方向 → 八方位，放開就停
+  var pad = document.querySelector('.dpad'), knob = pad.querySelector('.knob'), padPointer = null;
+  function padMove(e) {
+    var r = pad.getBoundingClientRect(), R = r.width / 2;
+    var vx = e.clientX - (r.left + R), vy = e.clientY - (r.top + R), dist = Math.sqrt(vx * vx + vy * vy);
+    var reach = Math.min(dist, R * 0.4) / Math.max(dist, 1);          // 小圓點跟著手指，但不超出圓盤
+    knob.style.transform = 'translate(' + Math.round(vx * reach) + 'px,' + Math.round(vy * reach) + 'px)';
+    if (dist < R * 0.22) { delete held.pad; applyWalk(); return; }   // 太靠近中心：不動
+    var oct = Math.round(Math.atan2(vy, vx) / (Math.PI / 4));          // 八方位
+    var DIRS8 = { 0: [1, 0], 1: [1, 1], 2: [0, 1], 3: [-1, 1], 4: [-1, 0], '-4': [-1, 0], '-3': [-1, -1], '-2': [0, -1], '-1': [1, -1] };
+    held.pad = DIRS8[oct];
+    applyWalk();
+  }
+  function padEnd(e) {
+    if (e.pointerId !== padPointer) return;
+    padPointer = null;
+    pad.classList.remove('on');
+    knob.style.transform = '';
+    delete held.pad;
+    applyWalk();
+  }
+  pad.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    padPointer = e.pointerId;
+    try { pad.setPointerCapture(e.pointerId); } catch (err) {}
+    pad.classList.add('on');
+    padMove(e);
   });
+  pad.addEventListener('pointermove', function (e) { if (e.pointerId === padPointer) { e.preventDefault(); padMove(e); } });
+  pad.addEventListener('pointerup', padEnd);
+  pad.addEventListener('pointercancel', padEnd);
+  pad.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  // 有些裝置的 (pointer: coarse) 判斷不準：一碰觸控螢幕就顯示搖桿
+  window.addEventListener('touchstart', function () { document.body.classList.add('touch'); }, { once: true, passive: true });
 
   document.addEventListener('keydown', function (e) {
     var t = e.target;

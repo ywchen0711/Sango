@@ -177,17 +177,27 @@ canvas.attack { cursor: crosshair; }
 .stances button.tac:last-child { border-radius: 0 4px 4px 0; }
 .stances button.tac.on { background: #24405a; border-color: #80c0ff; color: #c0e0ff; position: relative; }
 
-/* ---- 觸控裝置的方向鍵 (有實體鍵盤的電腦不顯示) ---- */
-.dpad { display: none; }
-@media (pointer: coarse) {
-  .dpad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 48px); gap: 4px;
-          user-select: none; -webkit-user-select: none; touch-action: none; }
-  .dpad button { font-size: 20px; padding: 0; touch-action: none; }
-  .dpad .up { grid-column: 2; grid-row: 1; }
-  .dpad .left { grid-column: 1; grid-row: 2; }
-  .dpad .right { grid-column: 3; grid-row: 2; }
-  .dpad .down { grid-column: 2; grid-row: 3; }
+/* ---- 觸控裝置的方向搖桿：半透明、疊在戰場左下角 (電腦不顯示) ---- */
+.screen-wrap { position: relative; width: 100%; max-width: 1024px; line-height: 0; }
+.dpad {
+  display: none; position: absolute; left: 3%; bottom: calc(15.4% + 10px); z-index: 2;
+  width: min(34vw, 150px); aspect-ratio: 1; border-radius: 50%; line-height: normal;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
+.dpad.on { border-color: rgba(248, 216, 56, 0.65); }
+.dpad .arrow { position: absolute; color: rgba(255, 255, 255, 0.6); font-size: clamp(12px, 3.5vw, 18px); pointer-events: none; }
+.dpad .up { top: 5%; left: 50%; transform: translateX(-50%); }
+.dpad .down { bottom: 5%; left: 50%; transform: translateX(-50%); }
+.dpad .left { left: 6%; top: 50%; transform: translateY(-50%); }
+.dpad .right { right: 6%; top: 50%; transform: translateY(-50%); }
+.dpad .knob {
+  position: absolute; left: 32%; top: 32%; width: 36%; height: 36%; border-radius: 50%; pointer-events: none;
+  background: rgba(255, 255, 255, 0.22); border: 2px solid rgba(255, 255, 255, 0.45);
+}
+@media (pointer: coarse) { .dpad { display: block; } }
+body.touch .dpad { display: block; }
 canvas.pointer { cursor: pointer; }
 .events { list-style: none; margin: 0; padding: 0; width: 100%; font-size: 13px; color: var(--muted);
           display: flex; flex-direction: column; gap: 2px; }

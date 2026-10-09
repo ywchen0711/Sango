@@ -14,7 +14,14 @@
     <section id="camp" class="panel" hidden></section>
     <section id="result" class="panel result" hidden></section>
     <div id="field" class="field" hidden>
-      <canvas id="screen"></canvas>
+      <div class="screen-wrap">
+        <canvas id="screen"></canvas>
+        <!-- 觸控裝置：半透明的方向搖桿，疊在戰場左下角 -->
+        <div class="dpad" aria-label="移動主將">
+          <span class="arrow up">▲</span><span class="arrow left">◀</span><span class="arrow right">▶</span><span class="arrow down">▼</span>
+          <span class="knob"></span>
+        </div>
+      </div>
       <div id="battle-bar" class="controls">
         <button id="btn-start" hidden>⏸ 暫停</button>
         <button id="btn-retreat" hidden>🏳 撤退</button>
@@ -38,12 +45,6 @@
           </span>
         </span>
         <span id="tac-hint" class="tac-hint"></span>
-      </div>
-      <div class="dpad" aria-label="移動主將">
-        <button data-walk="0,-1" class="up">▲</button>
-        <button data-walk="-1,0" class="left">◀</button>
-        <button data-walk="1,0" class="right">▶</button>
-        <button data-walk="0,1" class="down">▼</button>
       </div>
       <p class="help"><b>W A S D</b>（或方向鍵）移動主將，<b>滑鼠左鍵點敵人</b>讓主將攻擊該目標；放開方向鍵後主將原地固守<br>
         ⚔ 技巧：<b>Shift 突進</b>（往滑鼠方向衝刺、途中無敵、撞暈敵人，可打斷敵將重擊）・<b>F 旋風斬</b>（擊退周圍敵人）・

@@ -297,7 +297,7 @@
     var tx = Math.floor(lx / S.TILE), ty = Math.floor(ly / S.TILE);
     mouseTile = battle.inBounds(tx, ty) ? { x: tx, y: ty } : null;
     battle.units.forEach(function (u) {
-      if (u.dead || !battle.isVisible(u.x, u.y)) return;
+      if (u.dead || !battle.here(u) || !battle.isVisible(u.x, u.y)) return;
       var x = u.posX() * S.TILE, y = u.posY() * S.TILE;
       if (lx >= x && lx < x + S.TILE && ly >= y && ly < y + S.TILE) hoverUnit = u;
     });
@@ -336,7 +336,13 @@
       commandAt(mouseTile, hoverUnit);
       return;
     }
-    if (explore) { hint('用 W A S D 移動主將，點敵人攻擊'); return; }
+    var portal = explore && battle.portalAt(mouseTile.x, mouseTile.y);
+    if (portal && battle.seen[battle.idx(portal.x, portal.y)]) {   // 點洞穴入口 / 出口：主將走過去並進入
+      var okP = battle.commandGeneral(humanSide, { kind: 'move', x: portal.x, y: portal.y });
+      hint(okP ? (portal.exit ? '走向出口' : '前往 ' + portal.name) : '無法前往');
+      return;
+    }
+    if (explore) { hint('用 W A S D 移動主將，點敵人攻擊；走進洞穴入口可以切換場景'); return; }
     if (hoverUnit && hoverUnit === myGeneral) {
       setCommanding(!commanding);
       if (!commanding) hint('');

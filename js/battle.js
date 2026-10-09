@@ -155,12 +155,27 @@
     this.recruited = [];          // 被收服、願意加入的流浪武者 (soldiers.js 的士兵物件)
     this.sfx = [];                // 音效事件 { n: 名稱, x, y }，由 main.js 取出播放 (Node 模擬時沒人取，會被截斷)
     this.initEvents(opts);
-    this.walls = new Array(this.cols * this.rows);
-    this.occ = new Array(this.cols * this.rows);
-    for (var y = 0; y < this.rows; y++) {
-      for (var x = 0; x < this.cols; x++) {
-        this.walls[this.idx(x, y)] = this.map[y][x] === '#';
-        this.occ[this.idx(x, y)] = null;
+    if (this.explore) {
+      // 探索：野外 + 洞穴 / 迷宮，每個區域各有自己的地圖、牆、佔位、迷霧、寶箱與出入口
+      var areas = this.explore.areas || [{ name: '野外', theme: 'grass', map: this.explore.map, chests: this.explore.chests, shrines: this.explore.shrines, portals: [] }];
+      this.areas = areas.map(function (a) {
+        var W = a.map[0].length, H = a.map.length, walls = new Array(W * H), occ = new Array(W * H);
+        for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+          walls[y * W + x] = !!(S.TERRAIN[a.map[y][x]] || S.TERRAIN['#']).wall;
+          occ[y * W + x] = null;
+        }
+        return { name: a.name, theme: a.theme, kind: a.kind, map: a.map, cols: W, rows: H, walls: walls, occ: occ,
+                 seen: new Uint8Array(W * H), vis: new Uint8Array(W * H), src: a, portals: a.portals || [] };
+      });
+      this.useArea(0);
+    } else {
+      this.walls = new Array(this.cols * this.rows);
+      this.occ = new Array(this.cols * this.rows);
+      for (var y = 0; y < this.rows; y++) {
+        for (var x = 0; x < this.cols; x++) {
+          this.walls[this.idx(x, y)] = this.map[y][x] === '#';
+          this.occ[this.idx(x, y)] = null;
+        }
       }
     }
     if (this.explore) this.deployExplore();
@@ -178,40 +193,104 @@
     var cells = ex.startCells.slice();
     var mine = this.armies[0];
     var g = this.addUnit(0, 'general', cells[0].x, cells[0].y, mine);
+    g.area = 0;
     g.engaged = true;
     g.maxHp = g.hp = Math.round(g.maxHp * S.EXPLORE.HERO_HP);
     mine.units.forEach(function (t, i) {
       var c = cells[i + 1];
-      if (c) self.addUnit(0, typeof t === 'string' ? t : t.type, c.x, c.y, mine, typeof t === 'string' ? null : t);
+      if (c) self.addUnit(0, typeof t === 'string' ? t : t.type, c.x, c.y, mine, typeof t === 'string' ? null : t).area = 0;
     });
     ex.spawns.forEach(function (sp) {
-      var u = sp.wanderer ? self.addUnit(1, sp.type, sp.x, sp.y, self.armies[1], S.soldierStats(sp.wanderer))
-                          : self.addUnit(1, sp.type, sp.x, sp.y, self.armies[1]);
+      self.useArea(sp.area || 0);
+      var preset = sp.wanderer ? S.soldierStats(sp.wanderer) : sp.animal ? S.animalPreset(sp.animal, sp.lv || 0) : null;
+      var u = self.addUnit(1, sp.type, sp.x, sp.y, self.armies[1], preset);
+      u.area = sp.area || 0;
       if (sp.wanderer) u.wanderer = sp.wanderer;
+      if (sp.animal) {
+        var def = S.ANIMALS[sp.animal];
+        u.animal = sp.animal;
+        u.aggro = def.aggro;
+        u.passive = !!def.passive;
+      }
       u.camp = sp.camp;
       u.awake = false;
       u.engaged = true;
       if (sp.elite) self.makeElite(u, sp.elite);
     });
-    this.shrines = (ex.shrines || []).map(function (sh) { return { x: sh.x, y: sh.y, type: sh.type, used: false }; });
+    this.areas.forEach(function (a) {
+      a.shrines = (a.src.shrines || []).map(function (sh) { return { x: sh.x, y: sh.y, type: sh.type, used: false }; });
+      a.chests = (a.src.chests || []).map(function (c, i) {
+        return { id: i, x: c.x, y: c.y, loot: c.loot, quality: c.quality || null, item: c.loot ? 'loot' : self.rollChestItem(), open: true, born: 0 };
+      });
+    });
+    this.useArea(0);
     this.units.forEach(function (u) { if (u.side === 0) u.awake = true; });
     this.campLeft = {};
     this.units.forEach(function (u) { if (u.side === 1) self.campLeft[u.camp] = (self.campLeft[u.camp] || 0) + 1; });
     this.campsCleared = 0;
-    this.chests = ex.chests.map(function (c, i) {
-      return { id: i, x: c.x, y: c.y, loot: c.loot, item: c.loot ? 'loot' : null, open: true, born: 0 };
-    });
-    this.chests.forEach(function (c) { if (!c.loot) c.item = self.rollChestItem(); });
-    this.seen = new Uint8Array(this.cols * this.rows);   // 戰爭迷霧：探索過的格子
-    this.vis = new Uint8Array(this.cols * this.rows);    // 目前看得到的格子
+    this.travelReady = 0;
     this.updateVision();
+  };
+
+  // 切換目前的區域：地圖、牆、佔位、迷霧 (seen 探索過 / vis 看得到)、寶箱、神壇、出入口都換成該區域的
+  Battle.prototype.useArea = function (i) {
+    var a = this.areas[i];
+    this.area = i;
+    this.map = a.map; this.cols = a.cols; this.rows = a.rows;
+    this.walls = a.walls; this.occ = a.occ; this.seen = a.seen; this.vis = a.vis;
+    if (a.chests) this.chests = a.chests;
+    if (a.shrines) this.shrines = a.shrines;
+    this.portals = a.portals;
+  };
+  // 單位是否在目前的區域 (一般戰鬥永遠是)
+  Battle.prototype.here = function (u) { return !this.explore || (u.area || 0) === this.area; };
+  Battle.prototype.portalAt = function (x, y) {
+    var list = this.portals || [];
+    for (var i = 0; i < list.length; i++) if (list[i].x === x && list[i].y === y) return list[i];
+    return null;
+  };
+  var NO_TERRAIN = {};
+  Battle.prototype.terrainAt = function (x, y) {
+    return (this.explore && this.inBounds(x, y) && S.TERRAIN[this.map[y][x]]) || NO_TERRAIN;
+  };
+
+  // 走進洞穴 / 迷宮的入口 (或出口)：我軍全部跟著主將換到另一個區域；其他區域的敵人暫停不動
+  Battle.prototype.travel = function (p) {
+    var self = this, from = this.area;
+    var mine = this.units.filter(function (u) { return u.side === 0 && !u.dead && (u.area || 0) === from; });
+    mine.sort(function (a, b) { return (b.isGeneral ? 1 : 0) - (a.isGeneral ? 1 : 0); });
+    mine.forEach(function (u) { if (self.occ[self.idx(u.x, u.y)] === u) self.occ[self.idx(u.x, u.y)] = null; });
+    this.useArea(p.to);
+    var placed = 0;
+    for (var r = 0; r <= 8 && placed < mine.length; r++) {
+      for (var y = p.ty - r; y <= p.ty + r && placed < mine.length; y++) {
+        for (var x = p.tx - r; x <= p.tx + r && placed < mine.length; x++) {
+          if (cheb(x, y, p.tx, p.ty) !== r || !this.isFree(x, y, null) || this.portalAt(x, y) || this.chestAt(x, y)) continue;
+          var u = mine[placed++];
+          u.x = u.fromX = x; u.y = u.fromY = y; u.moveT = u.moveDur = 0;
+          u.area = p.to; u.target = null; u.chestGoal = null; u.chestForced = false; u.thinkCd = 0.3;
+          if (u.isGeneral) u.order = null;
+          this.occ[this.idx(x, y)] = u;
+        }
+      }
+    }
+    this.projectiles = [];
+    this.effects = [];
+    if (this.pendings) this.pendings = [];
+    this.units.forEach(function (u) { u.windup = null; });
+    this.travelReady = this.time + 1;
+    this.visionT = 0;
+    this.updateVision();
+    var a = this.areas[p.to];
+    this.notify(p.to === 0 ? '回到野外' : '進入 ' + a.name + (a.kind === 'labyrinth' ? '（迷宮深處藏有寶物）' : ''), '#c0e0ff');
+    this.sound('reinforce');
   };
 
   Battle.prototype.unitsNear = function (side, x, y, r) {
     var out = [];
     for (var i = 0; i < this.units.length; i++) {
       var o = this.units[i];
-      if (!o.dead && o.side === side && cheb(x, y, o.x, o.y) <= r) out.push(o);
+      if (!o.dead && o.side === side && cheb(x, y, o.x, o.y) <= r && this.here(o)) out.push(o);
     }
     return out;
   };
@@ -221,7 +300,7 @@
     var R = S.EXPLORE.COHESION, n = 0, near = 0;
     for (var i = 0; i < this.units.length; i++) {
       var o = this.units[i];
-      if (o.dead || o.side !== g.side || o.isGeneral) continue;
+      if (o.dead || o.side !== g.side || o.isGeneral || !this.here(o)) continue;
       n++;
       if (cheb(o.x, o.y, g.x, g.y) <= R) near++;
     }
@@ -287,6 +366,7 @@
           u.dead = false; u.deathT = 0; u.buffs = []; u.target = null; u.chestGoal = null;
           u.hp = Math.round(u.maxHp * 0.5); u.mp = 0;
           u.x = u.fromX = x; u.y = u.fromY = y; u.moveT = u.moveDur = 0;
+          u.area = this.area;
           this.occ[this.idx(x, y)] = u;
           this.addText(u, '援軍!', '#80c0ff', 1.4, -0.6);
           this.notify(u.name + ' 歸隊了！', '#80c0ff');
@@ -301,8 +381,9 @@
   Battle.prototype.exploreThink = function (u) {
     var E = S.EXPLORE;
     if (u.side === 1) {
+      if (u.passive) return this.fleeThink(u);
       if (!u.awake) {
-        if (this.unitsNear(0, u.x, u.y, E.AGGRO).length) this.wakeCamp(u.camp);
+        if (this.unitsNear(0, u.x, u.y, u.aggro || E.AGGRO).length) this.wakeCamp(u.camp);
         else { u.thinkCd = 0.4 + this.rng() * 0.3; return null; }
       }
       var far = cheb(u.x, u.y, u.homeX, u.homeY) > E.LEASH;
@@ -334,13 +415,53 @@
     return null;
   };
 
+  // 溫馴的動物 (鹿)：我軍靠近就逃開，平靜後慢慢走回原處
+  Battle.prototype.fleeThink = function (u) {
+    var threats = this.unitsNear(0, u.x, u.y, 6);
+    if (!threats.length) {
+      u.thinkCd = 0.5 + this.rng() * 0.4;
+      if (u.awake && cheb(u.x, u.y, u.homeX, u.homeY) > 2) this.stepToward(u, { x: u.homeX, y: u.homeY });
+      else u.awake = false;
+      return null;
+    }
+    u.awake = true;
+    var best = null, bestD = -1, dirs = this.shuffledDirs();
+    for (var d = 0; d < dirs.length; d++) {
+      if (!this.canStep(u.x, u.y, dirs[d][0], dirs[d][1], u, false)) continue;
+      var nx = u.x + dirs[d][0], ny = u.y + dirs[d][1], minD = Infinity;
+      for (var i = 0; i < threats.length; i++) minD = Math.min(minD, cheb(nx, ny, threats[i].x, threats[i].y));
+      if (minD > bestD) { bestD = minD; best = { x: nx, y: ny }; }
+    }
+    if (best) this.moveTo(u, best.x, best.y);
+    else u.thinkCd = 0.3;
+    return null;
+  };
+
+  // 打倒動物：鹿讓全軍回復兵力；熊 / 野豬 / 野狼有機率掉落裝備
+  Battle.prototype.animalKilled = function (e) {
+    if (e.animal === 'deer') {
+      this.alive(0).forEach(function (a) { a.hp = Math.min(a.maxHp, a.hp + a.maxHp * 0.15); });
+      this.addText(e, '獵到鹿!', '#80ff80', 1.4, -0.6);
+      this.notify('獵到一頭鹿，全軍飽餐一頓，兵力回復 15%', '#80ff80');
+      this.sound('shrine', e);
+      return;
+    }
+    var chance = { bear: 0.5, boar: 0.15, wolf: 0.1 }[e.animal] || 0;
+    if (this.rng() >= chance) return;
+    var item = S.rollLoot(this.explore.ilvl, this.mf), info = S.itemInfo(item);
+    this.lootFound.push(item);
+    this.addText(e, '戰利品!', S.QUALITIES[info.q].color, 1.6, -0.6);
+    this.notify('打倒' + e.name + '，獲得【' + S.QUALITIES[info.q].name + '】' + info.name, S.QUALITIES[info.q].color);
+    this.sound('loot_' + info.q, e);
+  };
+
   // 視野：我軍附近 VISION 格內看得到，並記錄為探索過
   Battle.prototype.updateVision = function () {
     var R = S.EXPLORE.VISION, W = this.cols, H = this.rows, vis = this.vis, seen = this.seen;
     vis.fill(0);
     for (var i = 0; i < this.units.length; i++) {
       var u = this.units[i];
-      if (u.dead || u.side !== 0) continue;
+      if (u.dead || u.side !== 0 || !this.here(u)) continue;
       for (var y = Math.max(0, u.y - R); y <= Math.min(H - 1, u.y + R); y++) {
         for (var x = Math.max(0, u.x - R); x <= Math.min(W - 1, u.x + R); x++) {
           var dx = x - u.x, dy = y - u.y;
@@ -415,7 +536,8 @@
   };
 
   Battle.prototype.alive = function (side) {
-    return this.units.filter(function (u) { return !u.dead && u.side === side; });
+    var self = this;
+    return this.units.filter(function (u) { return !u.dead && u.side === side && self.here(u); });
   };
 
   Battle.prototype.generalAlive = function (side) {
@@ -458,6 +580,7 @@
 
   Battle.prototype.updateUnit = function (u, dt) {
     if (u.dead) { if (u.deathT > 0) u.deathT -= dt; return; }
+    if (this.explore && (u.area || 0) !== this.area) return;   // 不在目前區域：暫停
     u.flashT -= dt; u.lungeT -= dt; u.atkCd -= dt; u.retargetCd -= dt; u.kiteCd -= dt;
     u.mp = Math.min(u.maxMp, u.mp + S.MP_REGEN * dt);
     this.updateBuffs(u, dt);
@@ -472,6 +595,9 @@
         if (chest) this.openChest(u, chest);
         var shrine = this.shrines && this.shrineAt(u.x, u.y);
         if (shrine) this.touchShrine(u, shrine);
+        // 玩家的主將自己走 (WASD) 或下令移動到出入口上 → 切換區域
+        var o = u.order, portal = this.explore && u.isGeneral && u.side === 0 && o && this.time >= this.travelReady && this.portalAt(u.x, u.y);
+        if (portal && (o.kind === 'walk' || (o.kind === 'move' && o.x === u.x && o.y === u.y))) this.travel(portal);
       }
       return;
     }
@@ -488,11 +614,11 @@
 
   Battle.prototype.think = function (u) {
     var enemies = this.alive(1 - u.side);
-    if (!enemies.length) return;
     if (this.explore) {
       enemies = this.exploreThink(u);
       if (!enemies) return;
     }
+    if (!enemies.length && !(u.order && u.order.kind !== 'attack')) { if (this.explore) u.thinkCd = 0.2; return; }
     if (u.elite) this.eliteThink(u, enemies);
     if (u.isGeneral && u.side === 1 && this.slamThink(u, enemies)) return;   // 敵將蓄力重擊
     if (!u.isGeneral) { enemies = this.stanceFilter(u, enemies); if (!enemies) return; }   // 方陣
@@ -737,7 +863,7 @@
     if (nx !== u.x) u.facing = sign(nx - u.x);
     u.x = nx; u.y = ny;
     u.moveT = 0;
-    u.moveDur = u.moveTime * (diag ? 1.3 : 1) * (u.findBuff('slow') ? 1.5 : 1);   // 緩速
+    u.moveDur = u.moveTime * (diag ? 1.3 : 1) * (u.findBuff('slow') ? 1.5 : 1) * (this.terrainAt(nx, ny).move || 1);   // 緩速、地貌 (森林 / 沼澤 / 冰原)
     u.charged = u.type === 'cavalry';
     u.thinkCd = 0;
   };
@@ -777,6 +903,7 @@
     u.charged = false;
 
     if (magic || (u.ranged && !adjacent)) {
+      hit.ranged = !magic;
       this.sound(magic ? 'magic' : 'arrow', u);
       var dist = euclid(u.x, u.y, e.x, e.y);
       this.projectiles.push({
@@ -812,6 +939,7 @@
         var ignore = Math.min(0.9, (sk.ignoreDef || 0) + (procs && !hit.magic ? procs.pierce / 100 : 0));
         var dmg = this.calcDamage(u, t, hit.magic, power, ignore);
         if (t !== e) dmg = Math.max(1, Math.round(dmg * this.aoeMul(t)));   // 範圍波及 (散開陣型減半)
+        if (hit.ranged) dmg = Math.max(1, Math.round(dmg * (this.terrainAt(t.x, t.y).rangedDef || 1)));   // 森林擋箭
         if (procs && procs.crit && this.rng() < procs.crit / 100) {
           dmg *= 2;
           this.addText(t, '致命!', '#ff4060', 0.9, -0.9);
@@ -969,7 +1097,8 @@
       this.log.push(this.time.toFixed(1) + 's ' + army.name + '軍 ' + e.name + ' 潰滅');
     }
     if (e.elite) this.eliteOnKill(e);
-    if (e.wanderer) this.tryRecruit(e);
+    if (e.animal) this.animalKilled(e);
+    else if (e.wanderer) this.tryRecruit(e);
     else if (this.explore && e.side === 1 && e.camp > 0) this.checkCampCleared(e.camp, e);
     this.checkVictory();
   };
@@ -1007,7 +1136,7 @@
   Battle.prototype.stats = function (side) {
     var s = { hp: 0, cavalry: 0, archer: 0, spear: 0 };
     this.units.forEach(function (u) {
-      if (u.side !== side || u.dead) return;
+      if (u.side !== side || u.dead || S.UNIT_TYPES[u.type].beast) return;
       if (u.isGeneral) s.hp = u.hp;
       else s[u.type] += u.hp;
     });

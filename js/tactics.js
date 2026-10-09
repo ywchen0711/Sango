@@ -81,9 +81,15 @@
     this.regenT = (this.regenT || 0) - dt;
     if (this.regenT > 0) return;
     this.regenT = 0.5;
+    // 熔岩：站在上面的單位每秒損失兵力
+    this.units.forEach(function (u) {
+      if (u.dead || !self.here(u) || u.isMoving()) return;
+      var burn = self.terrainAt(u.x, u.y).burn;
+      if (burn) self.applyDamage(u, Math.max(1, Math.round(u.maxHp * burn * 0.5)), '#ff8040');
+    });
     this.alive(0).forEach(function (u) {
-      var danger = self.unitsNear(1, u.x, u.y, E.REGEN_SAFE).some(function (e) { return e.awake; });
-      if (danger || u.hp >= u.maxHp) return;
+      var danger = self.unitsNear(1, u.x, u.y, E.REGEN_SAFE).some(function (e) { return e.awake && !e.passive; });
+      if (danger || u.hp >= u.maxHp || self.terrainAt(u.x, u.y).burn) return;
       u.hp = Math.min(u.maxHp, u.hp + u.maxHp * E.REGEN * 0.5);
       u.mp = Math.min(u.maxMp, u.mp + u.maxMp * E.REGEN * 0.5);
     });
@@ -299,7 +305,7 @@
     var enemies = this.alive(1 - side), allies = this.alive(side);
     if (this.explore) {
       var g = this.generals[side];
-      if (side === 1 && !this.bossAwake) return;
+      if (side === 1 && (!this.bossAwake || !this.here(g))) return;
       enemies = this.unitsNear(1 - side, g.x, g.y, 12).filter(function (e) { return e.awake; });
       allies = this.unitsNear(side, g.x, g.y, 12);
       if (!allies.length) return;
@@ -367,7 +373,8 @@
     var army = this.armies[u.side];
     var self = this;
     if (chest.loot) {               // 探索模式的裝備箱
-      var item = S.rollLoot(this.explore.ilvl, this.mf), info = S.itemInfo(item), color = S.QUALITIES[info.q].color;
+      var item = chest.quality ? S.makeItem({ ilvl: this.explore.ilvl, mf: this.mf, quality: chest.quality }) : S.rollLoot(this.explore.ilvl, this.mf);
+      var info = S.itemInfo(item), color = S.QUALITIES[info.q].color;
       if (u.side === 0) this.lootFound.push(item);
       this.addText(u, info.name, color, 1.6, -0.6);
       this.addBurst(u, color);

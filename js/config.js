@@ -61,7 +61,12 @@ window.Sango = window.Sango || {};
                chargeBonus: 1.3 },                       // 移動後第一擊衝鋒加成
     // 主將：與士兵同一尺度，再依武將能力加成 (見 S.GENERAL_STATS)，一樣有隨機浮動
     general: { name: '主將', hp: 0, mp: 30, atk: 6, def: 8, int: 4, spr: 6,
-               range: 1, moveTime: 0.40, attackTime: 0.9 }
+               range: 1, moveTime: 0.40, attackTime: 0.9 },
+    // 野外的動物 (探索模式)：能力會隨關卡成長，見 explore.js 的 S.ANIMALS
+    wolf: { name: '野狼', hp: 115, mp: 0, atk: 10, def: 6, int: 0, spr: 4, range: 1, moveTime: 0.32, attackTime: 0.9, beast: true },
+    boar: { name: '野豬', hp: 190, mp: 0, atk: 13, def: 9, int: 0, spr: 4, range: 1, moveTime: 0.36, attackTime: 1.2, beast: true },
+    bear: { name: '熊', hp: 420, mp: 0, atk: 18, def: 12, int: 0, spr: 8, range: 1, moveTime: 0.55, attackTime: 1.5, beast: true },
+    deer: { name: '鹿', hp: 90, mp: 0, atk: 1, def: 4, int: 0, spr: 3, range: 1, moveTime: 0.28, attackTime: 2.0, beast: true }
   };
   S.STAT_VARIANCE = 0.15;
 

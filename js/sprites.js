@@ -91,8 +91,157 @@
     spear:   [SPEAR, withRows(SPEAR, 12, ['...oooo....k....', '...oo..oo.......', '..oo....oo......'])],
     archer:  [ARCHER, withRows(ARCHER, 11, ['...oooo....k....', '...oo..oo.......', '..oo....oo......'])],
     cavalry: [CAVALRY, withRows(CAVALRY, 12, CAVALRY_LEGS)],
-    general: [GENERAL, withRows(GENERAL, 12, CAVALRY_LEGS)]
+    general: [GENERAL, withRows(GENERAL, 12, CAVALRY_LEGS)],
+    wolf: [[
+      '................',
+      '................',
+      '................',
+      '...........o.o..',
+      '..........ofofo.',
+      '..........offffo',
+      'o.........offefo',
+      'of.oooooooffffnn',
+      'offffffffffffoo.',
+      '.offfffffffffo..',
+      '..offfffffffdo..',
+      '..odffdddffddo..',
+      '..of.of...of.of.',
+      '..of.of...of.of.',
+      '..oo.oo...oo.oo.',
+      '................'
+    ], [
+      '................',
+      '................',
+      '................',
+      '...........o.o..',
+      '..........ofofo.',
+      '..........offffo',
+      'o.........offefo',
+      'of.oooooooffffnn',
+      'offffffffffffoo.',
+      '.offfffffffffo..',
+      '..offfffffffdo..',
+      '..odffdddffddo..',
+      '..of..of.of..of.',
+      '..of..of.of..of.',
+      '..oo..oo.oo..oo.',
+      '................'
+    ]],
+    boar: [[
+      '................',
+      '................',
+      '................',
+      '................',
+      '....o.o.o.o.....',
+      '...oddddddddoo..',
+      '..odddddddddddo.',
+      '.oddddddddddeddo',
+      '.odddddddddddddn',
+      '.oddddddddddddtn',
+      '..oddddddddddto.',
+      '..oddddddddddo..',
+      '...od.od..od.od.',
+      '...od.od..od.od.',
+      '...oo.oo..oo.oo.',
+      '................'
+    ], [
+      '................',
+      '................',
+      '................',
+      '................',
+      '....o.o.o.o.....',
+      '...oddddddddoo..',
+      '..odddddddddddo.',
+      '.oddddddddddeddo',
+      '.odddddddddddddn',
+      '.oddddddddddddtn',
+      '..oddddddddddto.',
+      '..oddddddddddo..',
+      '...od..od.od..od',
+      '...od..od.od..od',
+      '...oo..oo.oo..oo',
+      '................'
+    ]],
+    bear: [[
+      '................',
+      '................',
+      '...........oo...',
+      '..........odoo..',
+      '....oooooodddoo.',
+      '...oddddddddedo.',
+      '..odddddddddddno',
+      '.oddddddddddddo.',
+      '.odddddddddddo..',
+      '.odddddddddddo..',
+      '.oddddddddddddo.',
+      '.oddddddddddddo.',
+      '..odd.odd.odd.o.',
+      '..odd.odd.odd.o.',
+      '..ooo.ooo.ooo...',
+      '................'
+    ], [
+      '................',
+      '................',
+      '...........oo...',
+      '..........odoo..',
+      '....oooooodddoo.',
+      '...oddddddddedo.',
+      '..odddddddddddno',
+      '.oddddddddddddo.',
+      '.odddddddddddo..',
+      '.odddddddddddo..',
+      '.oddddddddddddo.',
+      '.oddddddddddddo.',
+      '..odd..odd.odd..',
+      '..odd..odd.odd..',
+      '..ooo..ooo.ooo..',
+      '................'
+    ]],
+    deer: [[
+      '..........t.t...',
+      '..........tt.t..',
+      '...........tt...',
+      '..........offo..',
+      '..........ofeo..',
+      '..........offnn.',
+      '.w.......offo...',
+      'owoooooooffo....',
+      '.offffffffffo...',
+      '.offffffffffo...',
+      '..offffffffo....',
+      '..of.of..of.of..',
+      '..of.of..of.of..',
+      '..of.of..of.of..',
+      '..oo.oo..oo.oo..',
+      '................'
+    ], [
+      '..........t.t...',
+      '..........tt.t..',
+      '...........tt...',
+      '..........offo..',
+      '..........ofeo..',
+      '..........offnn.',
+      '.w.......offo...',
+      'owoooooooffo....',
+      '.offffffffffo...',
+      '.offffffffffo...',
+      '..offffffffo....',
+      '..of.of..of.of..',
+      '..of..of.of..of.',
+      '..of..of.of..of.',
+      '..oo..oo.oo..oo.',
+      '................'
+    ]]
   };
+
+  // 動物 (探索模式的野外)：毛色固定，不分陣營
+  var ANIMAL_PALETTES = {
+    wolf: { o: '#202020', f: '#909098', d: '#606068', e: '#f8d838', n: '#202020' },
+    boar: { o: '#201008', d: '#6a4020', e: '#f84020', n: '#c08060', t: '#f8f0d0' },
+    bear: { o: '#100804', d: '#4a2a14', e: '#f8f0d0', n: '#201008' },
+    deer: { o: '#382010', f: '#c08040', e: '#202020', n: '#382010', t: '#e8d8b0', w: '#ffffff' }
+  };
+
 
   // 頭像：O 輪廓 H 頭盔 h 頭盔飾 S 臉 E 眼 M 嘴 B 鬍鬚 A 鎧甲 a 鎧甲紋
   S.PORTRAIT_DATA = [
@@ -153,7 +302,7 @@
     var out = [{}, {}];
     for (var side = 0; side < 2; side++) {
       for (var type in S.SPRITE_DATA) {
-        var pal = merge(COMMON, S.SIDE_PALETTES[side], type === 'general' ? GENERAL_HORSE : {});
+        var pal = ANIMAL_PALETTES[type] || merge(COMMON, S.SIDE_PALETTES[side], type === 'general' ? GENERAL_HORSE : {});
         var data = S.SPRITE_DATA[type];
         out[side][type] = {
           frames: data.map(function (r) { return paint(r, pal); }),

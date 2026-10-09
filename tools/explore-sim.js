@@ -52,13 +52,14 @@ function bot(b) {
     return;
   }
   if (g.order && g.order.kind !== 'hold') return;
-  const near = b.unitsNear(1, g.x, g.y, S.EXPLORE.ENGAGE);
+  const near = b.unitsNear(1, g.x, g.y, S.EXPLORE.ENGAGE).filter(e => !e.passive);
   if (near.length) { b.commandGeneral(0, { kind: 'attack', target: near[0] }); return; }
   // 等士兵跟上、回復兵力
   if (soldiers.some(u => Math.max(Math.abs(u.x - g.x), Math.abs(u.y - g.y)) > 6)) return;
   if (g.hp < g.maxHp * 0.8) return;
   let best = null, bestD = Infinity;
   b.alive(1).forEach(e => {
+    if (e.passive) return;   // 鹿會逃跑，不去追
     const d = Math.max(Math.abs(e.x - g.x), Math.abs(e.y - g.y)) + (e.camp === 0 ? 1000 : 0);
     if (d < bestD) { bestD = d; best = e; }
   });
@@ -81,7 +82,7 @@ S.STAGES.forEach((st, k) => {
       if (botT <= 0) { botT = 0.5; bot(b); }
     }
     ms += Date.now() - t0;
-    if (b.winner === 0) w++;
+    if (b.winner === 0) w++; else if (process.env.WHY) console.log('  敗因', b.state === 'fighting' ? '超時' : '主將陣亡', 'area', b.area, (b.log.slice(-4)).join(' / '));
     time += b.time;
     camps += b.campsCleared;
     loot += b.lootFound.length;

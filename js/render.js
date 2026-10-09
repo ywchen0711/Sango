@@ -7,6 +7,9 @@
   var FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
   var PANEL_BG = '#f8c4bc';
   var BAR_COLORS = ['#58a8f8', '#f86838'];
+  // 小地圖的地貌顏色
+  var MINI_COLORS = { '.': [70, 110, 60], '#': [150, 150, 150], '~': [50, 100, 190], 'T': [30, 70, 30], 'f': [45, 90, 40],
+                      's': [90, 100, 55], 'i': [200, 225, 240], 'l': [220, 80, 20] };
 
   function Renderer(canvas) {
     this.canvas = canvas;
@@ -26,8 +29,9 @@
     this.hoverChest = null;
   }
 
-  // ---- 地面 + 城牆 (預先畫好)：一般戰鬥是磚地，探索模式是草地 ----
-  function buildField(map, grass) {
+  // ---- 地面 + 城牆 (預先畫好)：一般戰鬥是磚地；探索模式的野外是草地 (theme 'grass')、洞穴是岩地 (theme 'cave') ----
+  function buildField(map, theme) {
+    var grass = !!theme;
     var cols = map[0].length, rows = map.length;
     var c = document.createElement('canvas');
     c.width = cols * S.TILE;
@@ -48,6 +52,20 @@
         }
       }
     }
+    if (theme === 'cave') {
+      var DIRT = ['#6e6252', '#6a5e4e', '#72665a', '#665a4a'];
+      for (var cy = 0; cy < c.height; cy += 8) {
+        for (var cx = 0; cx < c.width; cx += 8) {
+          g.fillStyle = DIRT[(rnd() * DIRT.length) | 0];
+          g.fillRect(cx, cy, 8, 8);
+        }
+      }
+      for (var q = 0; q < cols * rows; q++) {         // 碎石
+        g.fillStyle = rnd() < 0.7 ? '#544a3c' : '#8a8070';
+        g.fillRect((rnd() * c.width) | 0, (rnd() * c.height) | 0, 2, 1);
+      }
+      return drawTerrain(g, map, cols, rows, rnd, theme), c;
+    }
     if (grass) {
       var GREENS = ['#5c8c3c', '#5a883a', '#60903e', '#56843a', '#5e8a40'];
       for (var gy = 0; gy < c.height; gy += 8) {
@@ -61,6 +79,7 @@
         g.fillStyle = r < 0.85 ? '#4a7830' : r < 0.95 ? '#78a050' : '#e8e080';
         g.fillRect((rnd() * c.width) | 0, (rnd() * c.height) | 0, 1, r < 0.85 ? 2 : 1);
       }
+      return drawTerrain(g, map, cols, rows, rnd, theme), c;
     } else {
       bricks(0, 0, c.width, c.height, ['#a8a8a8', '#a0a0a0', '#a4a4a4', '#b0b0b0', '#a0a0a0', '#8c8c8c'], '#888888');
     }
@@ -89,6 +108,68 @@
     return c;
   }
 
+  // ---- 探索地圖的地貌：岩石、深水、樹木、森林、沼澤、冰原、熔岩 ----
+  function drawTerrain(g, map, cols, rows, rnd, theme) {
+    var T = S.TILE, cave = theme === 'cave';
+    function at(x, y) { return x >= 0 && y >= 0 && x < cols && y < rows ? map[y][x] : '#'; }
+    function speckle(px, py, colors, n, w, h) {
+      for (var i = 0; i < n; i++) {
+        g.fillStyle = colors[(rnd() * colors.length) | 0];
+        g.fillRect(px + ((rnd() * (T - (w || 1))) | 0), py + ((rnd() * (T - (h || 1))) | 0), w || 1, h || 1);
+      }
+    }
+    // 先畫地面類 (森林 / 沼澤 / 冰原 / 熔岩 / 水)
+    for (var y = 0; y < rows; y++) {
+      for (var x = 0; x < cols; x++) {
+        var ch = map[y][x], px = x * T, py = y * T;
+        if (ch === 'f' || ch === 'T') {
+          g.fillStyle = '#3c6a2c'; g.fillRect(px, py, T, T);
+          speckle(px, py, ['#2e5422', '#46783a', '#335e26'], 10, 2, 2);
+        } else if (ch === 's') {
+          g.fillStyle = '#4e5a34'; g.fillRect(px, py, T, T);
+          g.fillStyle = '#3a4a3a'; g.fillRect(px + 2 + ((rnd() * 4) | 0), py + 4 + ((rnd() * 6) | 0), 7, 3);
+          speckle(px, py, ['#6a7a40', '#2c3a28', '#80904c'], 6, 2, 1);
+        } else if (ch === 'i') {
+          g.fillStyle = '#c8e0f0'; g.fillRect(px, py, T, T);
+          speckle(px, py, ['#e8f4ff', '#a8c8e0', '#ffffff'], 5, 4, 1);
+        } else if (ch === 'l') {
+          g.fillStyle = '#c83810'; g.fillRect(px, py, T, T);
+          speckle(px, py, ['#f88820', '#f8c040', '#801808'], 9, 3, 2);
+        } else if (ch === '~') {
+          g.fillStyle = cave ? '#1c3450' : '#2860a8'; g.fillRect(px, py, T, T);
+          speckle(px, py, cave ? ['#2c4a6a'] : ['#4880c8', '#3870b8'], 3, 5, 1);
+          // 岸邊
+          g.fillStyle = cave ? '#2a2620' : '#c8b878';
+          if (at(x, y - 1) !== '~' && at(x, y - 1) !== '#') g.fillRect(px, py, T, 2);
+          if (at(x, y + 1) !== '~' && at(x, y + 1) !== '#') g.fillRect(px, py + T - 2, T, 2);
+          if (at(x - 1, y) !== '~' && at(x - 1, y) !== '#') g.fillRect(px, py, 2, T);
+          if (at(x + 1, y) !== '~' && at(x + 1, y) !== '#') g.fillRect(px + T - 2, py, 2, T);
+        }
+      }
+    }
+    // 再畫立體的障礙物 (岩石、樹木)
+    for (y = 0; y < rows; y++) {
+      for (x = 0; x < cols; x++) {
+        ch = map[y][x]; px = x * T; py = y * T;
+        if (ch === '#') {
+          var top = at(x, y - 1) !== '#', bottom = at(x, y + 1) !== '#';
+          g.fillStyle = cave ? '#2a221c' : '#7a7468'; g.fillRect(px, py, T, T);
+          speckle(px, py, cave ? ['#3a3028', '#201a14'] : ['#8a8478', '#6a6458', '#94907e'], 7, 3, 2);
+          if (top) { g.fillStyle = cave ? '#4a4036' : '#a8a294'; g.fillRect(px, py, T, 3); }
+          if (bottom) { g.fillStyle = cave ? '#14100c' : '#4a463e'; g.fillRect(px, py + T - 4, T, 4); }
+          if (at(x - 1, y) !== '#') { g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(px, py, 2, T); }
+          if (bottom && y + 1 < rows) { g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(px, py + T, T, 3); }
+        } else if (ch === 'T') {
+          g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(px + 8, py + 14, 6, 2, 0, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#5a3818'; g.fillRect(px + 7, py + 9, 3, 6);
+          g.fillStyle = '#1e4a1a'; g.beginPath(); g.arc(px + 8, py + 6, 6.5, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#2e6a26'; g.beginPath(); g.arc(px + 7, py + 5, 4.5, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#4a8a3a'; g.fillRect(px + 5, py + 2, 3, 2);
+        }
+      }
+    }
+  }
+
   Renderer.prototype.portrait = function (side, army) {
     var key = side + ':' + army.name;
     if (!this.portraits[side] || this.portraits[side].key !== key) {
@@ -115,8 +196,15 @@
   // ---- 主繪製 ----
   Renderer.prototype.draw = function (battle, running) {
     var g = this.ctx, T = S.TILE, cam = this.cam;
-    if (this.fieldMap !== battle.map) {             // 換地圖 (探索模式每次都是新的大地圖)
-      this.field = buildField(battle.map, !!battle.explore);
+    if (this.fieldMap !== battle.map) {             // 換地圖 (探索模式每次都是新的大地圖，洞穴 / 迷宮各自一張)
+      this.fieldCache = (this.fieldCache || []).filter(function (f) { return battle.areas && battle.areas.some(function (a) { return a.map === f.map; }); });
+      var cached = this.fieldCache.filter(function (f) { return f.map === battle.map; })[0];
+      if (!cached) {
+        var theme = battle.areas ? battle.areas[battle.area].theme : battle.explore ? 'grass' : null;
+        cached = { map: battle.map, canvas: buildField(battle.map, theme) };
+        if (battle.areas) this.fieldCache.push(cached);
+      }
+      this.field = cached.canvas;
       this.fieldMap = battle.map;
       this.mini = null;
     }
@@ -134,7 +222,7 @@
     var x0 = cam.x / T - 1, y0 = cam.y / T - 1, x1 = (cam.x + S.FIELD_W) / T + 1, y1 = (cam.y + S.FIELD_H) / T + 1;
     function onScreen(x, y) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; }
     function shown(u) {           // 探索模式：看不到的敵人不畫
-      return onScreen(u.posX(), u.posY()) && (u.side === 0 || battle.isVisible(Math.round(u.posX()), Math.round(u.posY())));
+      return battle.here(u) && onScreen(u.posX(), u.posY()) && (u.side === 0 || battle.isVisible(Math.round(u.posX()), Math.round(u.posY())));
     }
     var list = battle.units.filter(function (u) { return (!u.dead || u.deathT > 0) && shown(u); });
     list.sort(function (a, b) { return a.posY() - b.posY(); });
@@ -147,6 +235,7 @@
       var fx = battle.effects[e];
       if (onScreen(fx.x, fx.y) && battle.isVisible(Math.round(fx.x), Math.round(fx.y))) this.drawEffect(fx);
     }
+    if (battle.portals) this.drawPortalLabels(battle);
     this.drawAim();
     this.drawOrders(battle);
     this.drawFocus(battle);
@@ -231,8 +320,9 @@
       for (var i = 0; i < W * H; i++) {
         var o = i * 4;
         if (!battle.seen[i]) { d[o + 3] = 0; continue; }
-        var wall = battle.walls[i];
-        d[o] = wall ? 150 : 70; d[o + 1] = wall ? 150 : 110; d[o + 2] = wall ? 150 : 60; d[o + 3] = 230;
+        var col = MINI_COLORS[battle.map[(i / W) | 0][i % W]] || (battle.walls[i] ? [150, 150, 150] : [70, 110, 60]);
+        if (battle.areas && battle.areas[battle.area].theme === 'cave') col = battle.walls[i] ? (col[2] > 150 ? col : [60, 50, 40]) : col === MINI_COLORS['.'] ? [120, 104, 86] : col;
+        d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = 230;
       }
       mg.putImageData(img, 0, 0);
     }
@@ -250,17 +340,48 @@
       g.fillStyle = S.SHRINES[sh.type].color;
       g.fillRect(mx + sh.x * s - 1, my + sh.y * s - 1, 2, 2);
     });
+    (battle.portals || []).forEach(function (p) {
+      if (!battle.seen[p.y * W + p.x]) return;
+      g.fillStyle = p.exit ? '#f0f0a0' : '#c060ff';
+      g.fillRect(mx + p.x * s - 1.5, my + p.y * s - 1.5, 3, 3);
+    });
     var boss = battle.explore.boss;
-    if (battle.seen[boss.y * W + boss.x] && battle.generalAlive(1)) this.text('★', mx + boss.x * s, my + boss.y * s, 6, '#ff5040', 'center', '#000');
+    if (!battle.area && battle.seen[boss.y * W + boss.x] && battle.generalAlive(1)) this.text('★', mx + boss.x * s, my + boss.y * s, 6, '#ff5040', 'center', '#000');
     battle.units.forEach(function (u) {
-      if (u.dead || (u.side === 1 && !battle.isVisible(u.x, u.y))) return;
-      g.fillStyle = u.side === 0 ? (u.isGeneral ? '#ffffff' : '#58a8f8') : '#ff4030';
+      if (u.dead || !battle.here(u) || (u.side === 1 && !battle.isVisible(u.x, u.y))) return;
+      g.fillStyle = u.side === 0 ? (u.isGeneral ? '#ffffff' : '#58a8f8') : u.animal ? '#e0a040' : '#ff4030';
       var sz = u.isGeneral ? 2.5 : 1.5;
       g.fillRect(mx + u.x * s - sz / 2, my + u.y * s - sz / 2, sz, sz);
     });
     g.strokeStyle = 'rgba(255,255,255,0.7)';
     g.lineWidth = 0.5;
     g.strokeRect(mx + this.cam.x / S.TILE * s, my + this.cam.y / S.TILE * s, S.FIELD_W / S.TILE * s, S.FIELD_H / S.TILE * s);
+  };
+
+  // ---- 洞穴 / 迷宮的出入口：野外是黑色洞口，洞裡是往上的階梯；上方標名稱 ----
+  Renderer.prototype.drawPortals = function (battle) {
+    var g = this.ctx, T = S.TILE, self = this;
+    (battle.portals || []).forEach(function (p) {
+      if (!battle.seen[p.y * battle.cols + p.x]) return;
+      var x = p.x * T, y = p.y * T, glow = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+      if (p.exit) {
+        g.fillStyle = '#8a8070'; g.fillRect(x + 1, y + 2, 14, 13);
+        for (var i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#b0a690' : '#d0c8b0'; g.fillRect(x + 2 + i, y + 3 + i * 3, 12 - i * 2, 3); }
+        g.fillStyle = 'rgba(255,255,200,' + (0.2 + 0.3 * glow) + ')'; g.fillRect(x + 1, y + 2, 14, 13);
+      } else {
+        g.fillStyle = '#5a5248'; g.beginPath(); g.ellipse(x + 8, y + 10, 8, 7, 0, Math.PI, 0); g.fill(); g.fillRect(x, y + 10, 16, 5);
+        g.fillStyle = '#100808'; g.beginPath(); g.ellipse(x + 8, y + 11, 5, 5, 0, Math.PI, 0); g.fill(); g.fillRect(x + 3, y + 11, 10, 4);
+        g.fillStyle = 'rgba(192,96,255,' + (0.25 + 0.35 * glow) + ')'; g.fillRect(x + 4, y + 9, 8, 6);
+      }
+    });
+  };
+  // 出入口的名稱 (畫在單位上方，才不會被擋住)
+  Renderer.prototype.drawPortalLabels = function (battle) {
+    var T = S.TILE, self = this;
+    (battle.portals || []).forEach(function (p) {
+      if (!battle.seen[p.y * battle.cols + p.x]) return;
+      self.text(p.exit ? '出口' : p.name, p.x * T + 8, p.y * T - 3, 6, p.exit ? '#ffffc0' : '#e0b0ff', 'center', '#000');
+    });
   };
 
   // ---- 玩家主將：操控中畫黃框；移動命令畫虛線與目的地 X，攻擊命令標出目標 ----
@@ -302,8 +423,9 @@
   Renderer.prototype.drawChests = function (battle) {
     var g = this.ctx, T = S.TILE;
     var self = this;
+    this.drawPortals(battle);
     battle.units.forEach(function (u) {
-      if (u.dead || !u.chestGoal) return;
+      if (u.dead || !u.chestGoal || !battle.here(u)) return;
       g.strokeStyle = u.side === 0 ? 'rgba(88,168,248,0.8)' : 'rgba(248,104,56,0.8)';
       g.lineWidth = u.chestForced ? 1 : 0.5;
       g.setLineDash([2, 2]);

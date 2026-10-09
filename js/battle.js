@@ -495,6 +495,11 @@
 
     // 玩家手動下令的主將 (移動 / 攻擊 / 固守，見 tactics.js)
     if (u.order) { this.followOrder(u, enemies); return; }
+    // 玩家的主將沒有被操控時會自動作戰；但兵力低於 35% 就不主動追擊，只反擊射程內的敵人 (讓他有時間回復)
+    if (u.isGeneral && this.isHuman(u.side) && !u.held && u.hp < u.maxHp * S.GENERAL_RETREAT_HP) {
+      if (!this.tryAttack(u, enemies)) u.thinkCd = 0.3;
+      return;
+    }
 
     // 主將：玩家按 Q 下令待命時退回後方 (只反擊射程內的敵人)；沒下令時和電腦一樣自行判斷出陣
     if (!u.engaged && this.isHuman(u.side) && u.held) {

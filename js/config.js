@@ -199,6 +199,7 @@ window.Sango = window.Sango || {};
 
   // ---- 戰鬥規則 ----
   S.GENERAL_HOLD_TIME = 25;        // 主將最多在後方觀望幾秒
+  S.GENERAL_RETREAT_HP = 0.35;     // 玩家主將兵力低於這個比例時，不會自動追擊
   S.GENERAL_ENGAGE_DIST = 3;       // 敵軍進入幾格內主將出擊
   S.GENERAL_ENGAGE_FRIENDS = 3;    // 己方士兵剩幾隊以下主將出擊
   S.MORALE_PENALTY = 0.75;         // 主將陣亡後全軍攻擊倍率

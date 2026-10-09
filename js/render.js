@@ -130,6 +130,7 @@
     g.beginPath(); g.rect(0, 0, S.FIELD_W, S.FIELD_H); g.clip();
     g.setTransform(S.SCALE, 0, 0, S.SCALE, -cam.x * S.SCALE, -cam.y * S.SCALE);
     this.drawChests(battle);
+    this.drawPendings(battle);
     var x0 = cam.x / T - 1, y0 = cam.y / T - 1, x1 = (cam.x + S.FIELD_W) / T + 1, y1 = (cam.y + S.FIELD_H) / T + 1;
     function onScreen(x, y) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; }
     function shown(u) {           // 探索模式：看不到的敵人不畫
@@ -148,6 +149,7 @@
     }
     this.drawAim();
     this.drawOrders(battle);
+    this.drawFocus(battle);
     if (battle.explore) this.drawFog(battle, Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1));
     g.restore();
 
@@ -156,6 +158,42 @@
     if (battle.explore) this.drawMinimap(battle);
     this.drawPanel(battle);
     this.drawOverlay(battle, running);
+  };
+
+  // 預警範圍：紅色閃爍，越接近落下越濃
+  Renderer.prototype.drawPendings = function (battle) {
+    var g = this.ctx, T = S.TILE;
+    (battle.pendings || []).forEach(function (p) {
+      var k = Math.min(1, p.t / p.dur), x = (p.x - p.r) * T, y = (p.y - p.r) * T, w = (2 * p.r + 1) * T;
+      var blink = 0.5 + 0.5 * Math.sin(Date.now() / 60);
+      g.fillStyle = 'rgba(255,40,20,' + (0.12 + 0.35 * k) + ')';
+      g.fillRect(x, y, w, w);
+      g.fillStyle = 'rgba(255,60,30,' + (0.25 + 0.2 * blink) + ')';
+      var inner = w * k;                          // 由中心向外擴張的實心方塊 = 倒數
+      g.fillRect(x + (w - inner) / 2, y + (w - inner) / 2, inner, inner);
+      g.strokeStyle = 'rgba(255,' + Math.round(80 + 120 * blink) + ',60,0.95)';
+      g.lineWidth = 1;
+      g.strokeRect(x + 0.5, y + 0.5, w - 1, w - 1);
+    });
+  };
+
+  // 集火目標：旋轉的紅色準星
+  Renderer.prototype.drawFocus = function (battle) {
+    var f = battle.focus && battle.focus[0];
+    if (!f || f.dead || !battle.isVisible(f.x, f.y)) return;
+    var g = this.ctx, T = S.TILE, cx = f.posX() * T + 8, cy = f.posY() * T + 8, a = Date.now() / 300;
+    g.strokeStyle = '#ff4030';
+    g.lineWidth = 1;
+    for (var i = 0; i < 4; i++) {
+      var ang = a + i * Math.PI / 2, r = 10;
+      var px = cx + Math.cos(ang) * r, py = cy + Math.sin(ang) * r;
+      g.beginPath();
+      g.moveTo(px, py);
+      g.lineTo(px - Math.cos(ang) * 3 + Math.cos(ang + Math.PI / 2) * 2.5, py - Math.sin(ang) * 3 + Math.sin(ang + Math.PI / 2) * 2.5);
+      g.moveTo(px, py);
+      g.lineTo(px - Math.cos(ang) * 3 - Math.cos(ang + Math.PI / 2) * 2.5, py - Math.sin(ang) * 3 - Math.sin(ang + Math.PI / 2) * 2.5);
+      g.stroke();
+    }
   };
 
   // 鏡頭：探索模式以主將為中心 (邊界停住)；一般戰鬥固定在左上角
@@ -400,6 +438,11 @@
     if (frame && u.type !== 'cavalry' && u.type !== 'general') y -= 1;
     x = Math.round(x); y = Math.round(y);
 
+    if (u.windup && !u.dead) {    // 敵將蓄力：紅色光暈
+      g.fillStyle = 'rgba(255,50,30,' + (0.35 + 0.3 * Math.sin(Date.now() / 50)) + ')';
+      g.beginPath(); g.arc(x + 8, y + 8, 11, 0, Math.PI * 2); g.fill();
+    }
+    if (u.invulnT > 0 && Math.floor(Date.now() / 40) % 2) g.globalAlpha = 0.5;   // 突進中無敵
     if (u.elite && !u.dead) {     // 精英：腳下閃動的紫色光環
       g.fillStyle = 'rgba(200,110,255,' + (0.35 + 0.2 * Math.sin(time * 5)) + ')';
       g.beginPath(); g.ellipse(x + 8, y + 14, 9, 3.5, 0, 0, Math.PI * 2); g.fill();
@@ -416,6 +459,7 @@
       g.drawImage(img, x, y);
     }
 
+    g.globalAlpha = 1;
     if (u.dead) return;
     if (this.showBars) {
       g.fillStyle = '#202020';
@@ -503,7 +547,17 @@
     var k = fx.t / fx.dur;
     var cx = fx.x * S.TILE + 8, cy = fx.y * S.TILE + 8;
     g.globalAlpha = Math.min(1, (1 - k) * 2);
-    if (fx.fx === 'text') {
+    if (fx.fx === 'trail') {
+      g.strokeStyle = fx.color;
+      g.lineWidth = 6 * (1 - k);
+      g.lineCap = 'round';
+      g.beginPath(); g.moveTo(cx, cy); g.lineTo(fx.x2 * S.TILE + 8, fx.y2 * S.TILE + 8); g.stroke();
+      g.lineCap = 'butt';
+    } else if (fx.fx === 'ring') {
+      g.strokeStyle = fx.color;
+      g.lineWidth = 3 * (1 - k) + 0.5;
+      g.beginPath(); g.arc(cx, cy, 6 + k * 18, 0, Math.PI * 2); g.stroke();
+    } else if (fx.fx === 'text') {
       this.text(fx.text, cx, cy - 6 - k * 8, 6, fx.color, 'center', '#000');
     } else if (fx.fx === 'boom') {
       // 陷阱爆炸：放射狀碎片

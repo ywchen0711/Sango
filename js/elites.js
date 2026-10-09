@@ -57,7 +57,7 @@
       this.sound('boom', e);
       this.alive(1 - e.side).forEach(function (o) {
         if (cheb(o.x, o.y, e.x, e.y) > 1) return;
-        self.applyDamage(o, Math.max(1, Math.round(o.maxHp * 0.15)), '#ff8040');
+        self.applyDamage(o, Math.max(1, Math.round(o.maxHp * 0.15 * self.aoeMul(o))), '#ff8040');
         if (!o.dead) self.applyBurn(e, o, { ratio: 0.5, dur: 4 });
       });
     }

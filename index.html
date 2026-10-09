@@ -30,6 +30,13 @@
         <button id="btn-general" class="tac general"></button>
         <button id="btn-command" class="tac general" title="點戰場上的地面讓主將走過去">點地移動<kbd>E</kbd></button>
         <span id="tac-buttons"></span>
+        <span class="skillbar">
+          <button id="btn-dash" class="tac skill"></button>
+          <button id="btn-whirl" class="tac skill"></button>
+          <span class="stances" title="陣型">
+            <button data-stance="free" class="tac">自由<kbd>C</kbd></button><button data-stance="tight" class="tac">方陣<kbd>Z</kbd></button><button data-stance="spread" class="tac">散開<kbd>X</kbd></button>
+          </span>
+        </span>
         <span id="tac-hint" class="tac-hint"></span>
       </div>
       <div class="dpad" aria-label="移動主將">
@@ -39,6 +46,9 @@
         <button data-walk="0,1" class="down">▼</button>
       </div>
       <p class="help"><b>W A S D</b>（或方向鍵）移動主將，<b>滑鼠左鍵點敵人</b>讓主將攻擊該目標；放開方向鍵後主將原地固守<br>
+        ⚔ 技巧：<b>Shift 突進</b>（往滑鼠方向衝刺、途中無敵、撞暈敵人，可打斷敵將重擊）・<b>F 旋風斬</b>（擊退周圍敵人）・
+        <b>右鍵敵人：全軍集火</b>・陣型 <b>Z 方陣</b>（防禦 +20%、緊跟主將）／<b>X 散開</b>（範圍傷害減半）／<b>C 自由</b><br>
+        ⚠ 地上出現<span style="color:#ff6040">紅色範圍</span>是敵人的計策或敵將的蓄力重擊，趕快移開！從敵人<b>背後</b>攻擊傷害 +30%<br>
         🗺 探索模式：走到寶箱上就會打開；靠近敵營會驚醒敵人，擊破敵營掉落裝備並有一隊陣亡士兵歸隊；
         非戰鬥時部隊會慢慢回復；打倒敵將過關，主將陣亡則失敗（撿到的裝備都能帶走）；右下角是小地圖<br>
         🔥 神壇：踩上去獲得增益（攻擊、防禦、回復、經驗、財寶、軍令），每座只能用一次<br>
@@ -61,6 +71,7 @@
   <script src="js/battle.js"></script>
   <script src="js/tactics.js"></script>
   <script src="js/elites.js"></script>
+  <script src="js/skills.js"></script>
   <script src="js/render.js"></script>
   <script src="js/sound.js"></script>
   <script src="js/main.js"></script>

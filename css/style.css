@@ -169,6 +169,13 @@ button small { color: var(--muted); margin-left: 4px; font-size: 12px; }
 canvas.aiming { cursor: crosshair; }
 canvas.commanding { cursor: cell; }
 canvas.attack { cursor: crosshair; }
+.skillbar { display: contents; }
+.tactics button.tac.skill { border-color: #c0a040; }
+.stances { display: inline-flex; }
+.stances button.tac { border-radius: 0; margin-left: -1px; padding: 5px 8px; }
+.stances button.tac:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+.stances button.tac:last-child { border-radius: 0 4px 4px 0; }
+.stances button.tac.on { background: #24405a; border-color: #80c0ff; color: #c0e0ff; position: relative; }
 
 /* ---- 觸控裝置的方向鍵 (有實體鍵盤的電腦不顯示) ---- */
 .dpad { display: none; }

@@ -42,10 +42,12 @@
     this.notices = [];            // 畫面上方的事件通知 { text, color, t, dur }
     this.tacticUses = {};
     this.chestOpens = {};
+    this.initSkills();            // 主將技能、集火、陣型、預警攻擊 (skills.js)
   };
 
   B.updateEvents = function (dt) {
     var C = S.COMMAND;
+    this.updateSkills(dt);
     for (var side = 0; side < 2; side++) {
       if (this.generalAlive(side)) this.gainCommand(side, C.REGEN * dt);
       this.globalCd[side] -= dt;
@@ -137,28 +139,10 @@
     if (tc.target) {
       var targets = this.tacticTargets(side, id, tx, ty);
       if (!targets.length) return false;
-      var power = tc.power * (tc.element === 'fire' ? this.fireMul() : 1);
-      var ti = S.TACTIC_INT.base + army.int * S.TACTIC_INT.ratio;
-      var caster = { side: side, isGeneral: true, stat: function () { return ti; } };
-      if (tc.radius > 0) {
-        for (var dx = -tc.radius; dx <= tc.radius; dx++) {
-          for (var dy = -tc.radius; dy <= tc.radius; dy++) {
-            if (this.inBounds(tx + dx, ty + dy)) {
-              this.effects.push({ fx: 'burst', x: tx + dx, y: ty + dy, color: tc.color, t: 0, dur: 0.6 });
-            }
-          }
-        }
-      }
-      targets.forEach(function (t) {
-        self.applyDamage(t, self.calcDamage(caster, t, true, power, 0), '#e0b0ff');
-        if (t.dead) return;
-        if (tc.burn) self.applyBurn(caster, t, tc.burn);
-        if (tc.stun) {
-          self.addBuff(t, { kind: 'stun', t: tc.stun });
-          self.addText(t, '混亂', '#e070ff', 0.9, -0.4);
-        }
-        if (tc.fx) self.addBurst(t, tc.color, tc.fx);
-      });
+      if (tc.radius === 0) { tx = targets[0].x; ty = targets[0].y; }   // 落雷吸附到目標所在的格子
+      // 敵方的計策先出現預警範圍才落下 (玩家可以躲)；玩家的計策立即生效
+      if (side === 1) this.telegraphTactic(side, id, tx, ty);
+      else this.applyTargetTactic(side, id, tx, ty);
     } else if (tc.buff) {
       var b = tc.buff;
       var mul = b.mul + army[b.from] / b.scale;
@@ -173,10 +157,39 @@
     this.tacticCd[side][id] = tc.cd;
     this.globalCd[side] = S.COMMAND.GLOBAL_CD;
     this.tacticUses[tc.name] = (this.tacticUses[tc.name] || 0) + 1;
-    this.sound('tac_' + id, tx != null ? { x: tx, y: ty } : g);
+    this.sound(tc.target && side === 1 ? 'alert' : 'tac_' + id, tx != null ? { x: tx, y: ty } : g);
     this.addText(g, tc.name + '!', tc.color, 1.4, -0.6);
     this.notify(army.name + ' 施展「' + tc.name + '」', tc.color);
     return true;
+  };
+
+  // 目標型計策的結算 (玩家立即、敵方在預警結束時)：範圍內的敵人受到魔法傷害與附加狀態
+  B.applyTargetTactic = function (side, id, tx, ty) {
+    var tc = S.TACTICS[id], army = this.armies[side], self = this;
+    var targets = tc.radius > 0 ? this.tacticTargets(side, id, tx, ty) :
+      this.alive(1 - side).filter(function (e) { return e.x === tx && e.y === ty; });
+    var power = tc.power * (tc.element === 'fire' ? this.fireMul() : 1);
+    var ti = S.TACTIC_INT.base + army.int * S.TACTIC_INT.ratio;
+    var caster = { side: side, isGeneral: true, stat: function () { return ti; } };
+    for (var dx = -tc.radius; dx <= tc.radius; dx++) {
+      for (var dy = -tc.radius; dy <= tc.radius; dy++) {
+        if (this.inBounds(tx + dx, ty + dy)) this.effects.push({ fx: 'burst', x: tx + dx, y: ty + dy, color: tc.color, t: 0, dur: 0.6 });
+      }
+    }
+    if (tc.fx === 'bolt') this.effects.push({ fx: 'bolt', x: tx, y: ty, color: tc.color, t: 0, dur: 0.3 });
+    targets.forEach(function (t) {
+      if (t.invulnT > 0) return;
+      var dmg = self.calcDamage(caster, t, true, power, 0) * (tc.radius > 0 ? self.aoeMul(t) : 1);
+      self.applyDamage(t, Math.max(1, Math.round(dmg)), '#e0b0ff');
+      if (t.dead) return;
+      if (tc.burn) self.applyBurn(caster, t, tc.burn);
+      if (tc.stun) {
+        self.addBuff(t, { kind: 'stun', t: tc.stun });
+        self.addText(t, '混亂', '#e070ff', 0.9, -0.4);
+      }
+      if (tc.fx) self.addBurst(t, tc.color, tc.fx);
+    });
+    if (side === 1) this.sound('tac_' + id, { x: tx, y: ty });
   };
 
   // 主將出陣 / 待機 (待機時退回布陣位置，只反擊射程內的敵人)

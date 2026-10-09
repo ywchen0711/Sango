@@ -11,6 +11,11 @@
   var chkBars = document.getElementById('chk-bars');
   var chkAutoTac = document.getElementById('chk-autotac');
   var btnSound = document.getElementById('btn-sound');
+  var btnDash = document.getElementById('btn-dash');
+  var btnWhirl = document.getElementById('btn-whirl');
+  var stanceBtns = document.querySelectorAll('[data-stance]');
+  var stanceKey = 'free';         // 我軍陣型 (下一場戰鬥沿用)
+  var mouseWorld = null;          // 滑鼠所在的地圖座標 (格)，突進方向用
   var roster = document.getElementById('roster');
   var tacticsEl = document.getElementById('tactics');
   var tacInfo = document.getElementById('tac-info');
@@ -40,6 +45,7 @@
     battle = S.currentBattle = new S.Battle(armies, { control: [true, false], autoTactics: [chkAutoTac.checked, false],
                                                       levels: levels, explore: explore,
                                                       eliteChance: extra.eliteChance, ilvl: extra.ilvl });   // S.currentBattle：方便在主控台除錯
+    battle.setStance(humanSide, stanceKey);
     running = false;
     overFired = false;
     acc = 0;
@@ -71,6 +77,47 @@
     btn.addEventListener('click', function () { onTactic(id); });
   });
   btnGeneral.addEventListener('click', toggleGeneral);
+
+  // ---- 主將技能與陣型 ----
+  function doDash() {
+    if (!canCommand()) return;
+    var g = battle.generals[humanSide];
+    if (!g || g.dead) return;
+    var dx, dy;
+    if (mouseWorld) { dx = mouseWorld.x - g.posX(); dy = mouseWorld.y - g.posY(); }
+    else {                        // 沒有滑鼠 (觸控)：衝向最近的敵人
+      var best = null, bd = 1e9;
+      battle.alive(1 - humanSide).forEach(function (e) {
+        var d = Math.max(Math.abs(e.x - g.x), Math.abs(e.y - g.y));
+        if (d < bd && battle.isVisible(e.x, e.y)) { bd = d; best = e; }
+      });
+      dx = best ? best.x - g.x : g.facing; dy = best ? best.y - g.y : 0;
+    }
+    var why = battle.generalDash(humanSide, dx, dy);
+    if (why) hint(S.GENERAL_SKILLS_DEF.dash.name + '：' + why);
+    updateTactics();
+  }
+  function doWhirl() {
+    if (!canCommand()) return;
+    var why = battle.generalWhirl(humanSide);
+    if (why) hint(S.GENERAL_SKILLS_DEF.whirl.name + '：' + why);
+    updateTactics();
+  }
+  function setStanceKey(k, user) {
+    stanceKey = k;
+    if (battle) battle.setStance(humanSide, k);
+    Array.prototype.forEach.call(stanceBtns, function (b) { b.classList.toggle('on', b.dataset.stance === k); });
+    if (user) { hint('陣型：' + S.STANCES[k].name + '（' + S.STANCES[k].desc + '）'); if (S.game.onSettings) S.game.onSettings(); }
+  }
+  btnDash.addEventListener('click', doDash);
+  btnWhirl.addEventListener('click', doWhirl);
+  btnDash.title = S.GENERAL_SKILLS_DEF.dash.desc;
+  btnWhirl.title = S.GENERAL_SKILLS_DEF.whirl.desc;
+  Array.prototype.forEach.call(stanceBtns, function (b) {
+    b.title = S.STANCES[b.dataset.stance].desc;
+    b.addEventListener('click', function () { setStanceKey(b.dataset.stance, true); b.blur(); });
+  });
+  setStanceKey('free');
   btnCommand.addEventListener('click', function () { setCommanding(!commanding); updateTactics(); });
 
   function hint(text) { tacHint.textContent = text; hintT = 2.5; }
@@ -150,6 +197,11 @@
     btnGeneral.disabled = !alive || !canCommand();
     if (commanding && (!alive || !canCommand())) setCommanding(false);
     btnCommand.disabled = !alive || !canCommand();
+    [['dash', btnDash], ['whirl', btnWhirl]].forEach(function (p) {
+      var def = S.GENERAL_SKILLS_DEF[p[0]], cd = battle.skillCooldown(side, p[0]);
+      p[1].innerHTML = def.name + (cd > 0 ? '<small>' + Math.ceil(cd) + 's</small>' : '') + '<kbd>' + def.key + '</kbd>';
+      p[1].disabled = !canCommand() || !!battle.skillBlocked(side, p[0]);
+    });
     btnCommand.classList.toggle('aiming', commanding);
     S.TACTIC_IDS.forEach(function (id) {
       var tc = S.TACTICS[id];
@@ -240,6 +292,7 @@
     mouseTile = hoverUnit = null;
     if (sy >= S.FIELD_H) return;
     var lx = sx + renderer.cam.x, ly = sy + renderer.cam.y;
+    mouseWorld = { x: lx / S.TILE - 0.5, y: ly / S.TILE - 0.5 };
     var tx = Math.floor(lx / S.TILE), ty = Math.floor(ly / S.TILE);
     mouseTile = battle.inBounds(tx, ty) ? { x: tx, y: ty } : null;
     battle.units.forEach(function (u) {
@@ -299,6 +352,11 @@
   canvas.addEventListener('contextmenu', function (e) {
     if (aiming) { e.preventDefault(); cancelAim(); hint(''); updateTactics(); }
     else if (commanding) { e.preventDefault(); setCommanding(false); hint(''); updateTactics(); }
+    else if (canCommand()) {      // 右鍵敵人：全軍集火
+      e.preventDefault();
+      locate(e);
+      if (hoverUnit && hoverUnit.side !== humanSide && battle.setFocus(humanSide, hoverUnit)) hint('全軍集火：' + hoverUnit.name);
+    }
   });
 
   function toggle() {
@@ -434,6 +492,11 @@
       return;
     }
     if (e.code === 'Space') { e.preventDefault(); toggle(); }
+    else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { if (!e.repeat) doDash(); }
+    else if (e.code === 'KeyF') { if (!e.repeat) doWhirl(); }
+    else if (e.code === 'KeyZ') setStanceKey('tight', true);
+    else if (e.code === 'KeyX') setStanceKey('spread', true);
+    else if (e.code === 'KeyC') setStanceKey('free', true);
     else if (e.code === 'KeyQ') toggleGeneral();
     else if (e.code === 'KeyE') { setCommanding(!commanding); updateTactics(); }
     else if (e.code === 'Escape') { cancelAim(); setCommanding(false); hint(''); updateTactics(); }
@@ -482,11 +545,12 @@
       updateTactics();
     },
     setCaption: function (c) { renderer.caption = c; },
-    getSettings: function () { return { speed: speed, bars: chkBars.checked, autoTactics: chkAutoTac.checked, sound: S.Sound.level }; },
+    getSettings: function () { return { speed: speed, bars: chkBars.checked, autoTactics: chkAutoTac.checked, sound: S.Sound.level, stance: stanceKey }; },
     applySettings: function (set) {
       set = set || {};
       if (set.speed) setSpeed(Number(set.speed));
       if (set.bars != null) { chkBars.checked = !!set.bars; renderer.showBars = chkBars.checked; }
+      if (set.stance && S.STANCES[set.stance]) setStanceKey(set.stance);
       if (set.sound != null) { S.Sound.setLevel(set.sound); btnSound.textContent = S.Sound.icon(); }
       if (set.autoTactics != null) { chkAutoTac.checked = !!set.autoTactics; if (battle) battle.autoTactics[0] = chkAutoTac.checked; }
     }

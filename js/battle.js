@@ -290,6 +290,8 @@
       return null;
     }
     var near = this.unitsNear(1, u.x, u.y, E.ENGAGE);
+    var f = this.focus[0];        // 集火目標：稍遠也會去打
+    if (f && !f.dead && !u.isGeneral && cheb(f.x, f.y, u.x, u.y) <= E.CHASE && near.indexOf(f) < 0) near.push(f);
     if (u.order) return this.alive(1);
     if (near.length) return near;
     if (u.chestGoal && u.chestGoal.open && this.stepToward(u, u.chestGoal)) return null;
@@ -463,6 +465,8 @@
       if (!enemies) return;
     }
     if (u.elite) this.eliteThink(u, enemies);
+    if (u.isGeneral && u.side === 1 && this.slamThink(u, enemies)) return;   // 敵將蓄力重擊
+    if (!u.isGeneral) { enemies = this.stanceFilter(u, enemies); if (!enemies) return; }   // 方陣
 
     // 玩家手動下令的主將 (移動 / 攻擊 / 固守，見 tactics.js)
     if (u.order) { this.followOrder(u, enemies); return; }
@@ -547,6 +551,7 @@
       var e = list[i];
       var s = S.matchup(u.type, e.type) + (1 - e.hp / e.maxHp) * 0.5 + (e.isGeneral ? 0.3 : 0);
       if (e === u.target) s += 0.2;
+      if (this.focus && e === this.focus[u.side] && !u.isGeneral) s += 5;   // 集火
       if (s > bestScore) { bestScore = s; best = e; }
     }
     return best;
@@ -554,6 +559,8 @@
 
   // 全域選目標：實際路徑距離 / 相剋偏好，並避免全部擠同一個目標
   Battle.prototype.chooseTarget = function (u, enemies) {
+    var focus = this.focus && this.focus[u.side];
+    if (focus && !focus.dead && !u.isGeneral && enemies.indexOf(focus) >= 0) return focus;   // 集火
     var field = this.distanceField(u.x, u.y, this.explore ? S.EXPLORE.CHASE + 6 : null);
     var allies = this.alive(u.side);
     var best = null, bestScore = Infinity;
@@ -764,6 +771,7 @@
       var t = targets[i];
       for (var h = 0; h < (sk.hits || 1) && !t.dead; h++) {
         var dmg = this.calcDamage(u, t, hit.magic, power, sk.ignoreDef || 0);
+        if (t !== e) dmg = Math.max(1, Math.round(dmg * this.aoeMul(t)));   // 範圍波及 (散開陣型減半)
         this.applyDamage(t, dmg, hit.magic ? '#e0b0ff' : null);
         if (u.elite) this.eliteOnHit(u, dmg);
       }
@@ -825,6 +833,16 @@
       base = u.stat('int'); guard = e.stat('spr'); matchup = 1;
     } else {
       base = u.stat('atk'); guard = e.stat('def') * (1 - ignoreDef); matchup = S.matchup(u.type, e.type);
+      // 背擊：從目標面向的反方向攻擊
+      if (u.x != null && e.facing && u.x !== e.x && (u.x - e.x) * e.facing < 0) {
+        mul *= S.BACKSTAB;
+        if (u.side === 0 && this.rng() < 0.35) this.addText(e, '背擊!', '#ffb040', 0.7, -0.9);
+      }
+    }
+    // 陣型：散開的士兵攻擊 -10%、方陣的士兵防禦 +20%
+    if (this.stance) {
+      if (!u.isGeneral && this.stance[u.side] === 'spread') mul *= S.STANCES.spread.atk;
+      if (!e.isGeneral && this.stance[e.side] === 'tight') guard *= S.STANCES.tight.def;
     }
     var dmg = base * strength * matchup * (14 / (guard + 4)) * morale * mul * (0.85 + this.rng() * 0.3);
     return Math.max(1, Math.round(dmg));
@@ -832,6 +850,7 @@
 
   Battle.prototype.applyDamage = function (e, dmg, color) {
     if (e.dead) return;
+    if (e.invulnT > 0) return;    // 突進中無敵
     if (this.explore && !e.awake) this.wakeCamp(e.camp);   // 被打就醒來
     e.hp -= dmg;
     e.flashT = 0.12;

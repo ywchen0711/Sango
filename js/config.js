@@ -7,31 +7,43 @@ window.Sango = window.Sango || {};
 (function (S) {
   'use strict';
 
-  // ---- 畫面 (NES 解析度 256x240，放大 SCALE 倍) ----
+  // ---- 畫面 (戰場 32x22 格，邏輯解析度 512x416，放大 SCALE 倍) ----
   S.TILE = 16;
-  S.COLS = 16;
-  S.ROWS = 11;
-  S.FIELD_W = S.COLS * S.TILE;          // 256
-  S.FIELD_H = S.ROWS * S.TILE;          // 176
+  S.COLS = 32;
+  S.ROWS = 22;
+  S.FIELD_W = S.COLS * S.TILE;          // 512
+  S.FIELD_H = S.ROWS * S.TILE;          // 352
   S.PANEL_H = 64;
   S.VIEW_W = S.FIELD_W;
-  S.VIEW_H = S.FIELD_H + S.PANEL_H;     // 240
+  S.VIEW_H = S.FIELD_H + S.PANEL_H;     // 416
   S.SCALE = 3;
   S.SIM_DT = 1 / 60;                    // 固定模擬步長 (秒)
 
   // ---- 地圖：'#' 城牆 (不可通行)，'.' 地面 ----
+  // 左右、上下對稱：中央兩座城寨、中路石柱分出三條路、兩翼岩石
   S.MAP = [
-    '................',
-    '......#..#......',
-    '......#..#......',
-    '......####......',
-    '................',
-    '................',
-    '................',
-    '......####......',
-    '......#..#......',
-    '......#..#......',
-    '................'
+    '................................',
+    '................................',
+    '............#......#............',
+    '............#......#............',
+    '.......##...#......#...##.......',
+    '.......##...#......#...##.......',
+    '............########............',
+    '................................',
+    '................................',
+    '..........#..........#..........',
+    '..........#..........#..........',
+    '..........#..........#..........',
+    '..........#..........#..........',
+    '................................',
+    '................................',
+    '............########............',
+    '.......##...#......#...##.......',
+    '.......##...#......#...##.......',
+    '............#......#............',
+    '............#......#............',
+    '................................',
+    '................................'
   ];
 
   // ---- 兵種 ----
@@ -147,8 +159,8 @@ window.Sango = window.Sango || {};
     FIRST: [5, 10],                // 第一個寶箱出現時間範圍
     INTERVAL: [9, 16],            // 之後每隔幾秒出現一個
     MAX: 2,                        // 場上最多幾個
-    AUTO_DIST: 3,                  // 附近幾步內沒在交戰的士兵會自行去撿
-    AI_DIST: 7                     // 電腦方會派最近幾步內的士兵去撿
+    AUTO_DIST: 5,                  // 附近幾步內沒在交戰的士兵會自行去撿
+    AI_DIST: 11                    // 電腦方會派最近幾步內的士兵去撿
   };
   // weight: 出現權重
   S.CHEST_ITEMS = {
@@ -197,21 +209,94 @@ window.Sango = window.Sango || {};
 
   // ---- 布陣 (左軍座標，右軍自動左右鏡像) ----
   S.FORMATION = {
-    general: [[0, 5]],
-    spear:   [[3, 4], [3, 6], [3, 5], [3, 3], [3, 7], [3, 2], [3, 8], [2, 5], [2, 3], [2, 7]],
-    archer:  [[1, 4], [1, 6], [1, 5], [2, 4], [2, 6], [1, 3], [1, 7], [2, 3], [2, 7], [1, 2]],
-    cavalry: [[2, 1], [2, 9], [3, 1], [3, 9], [1, 1], [1, 9], [2, 2], [2, 8], [0, 1], [0, 9]]
+    general: [[1, 10], [1, 11]],
+    spear:   [[6, 10], [6, 11], [6, 9], [6, 12], [6, 8], [6, 13], [6, 7], [6, 14], [5, 9], [5, 12]],
+    archer:  [[3, 10], [3, 11], [3, 9], [3, 12], [4, 8], [4, 13], [3, 8], [3, 13], [4, 7], [4, 14]],
+    cavalry: [[5, 4], [5, 17], [6, 5], [6, 16], [4, 4], [4, 17], [5, 6], [5, 15], [3, 5], [3, 16]]
   };
 
   S.UNIT_KINDS = ['spear', 'archer', 'cavalry'];
   S.UNITS_PER_ARMY = 9;
 
-  // ---- 經驗值與升級 (登入後才有；資料存在 Supabase) ----
-  // 戰鬥結束依結果獲得經驗值 (觀戰不給)；每花 COST 點經驗值可把主將或某一兵種升一級
-  // 每級讓玩家方該單位的 HP / MP / 攻擊 / 防禦 / 智力 / 精神 +BONUS
-  S.EXP = { win: 100, draw: 50, loss: 30 };
-  S.LEVEL = { COST: 100, BONUS: 0.05, MAX: 20 };
-  S.LEVEL_KEYS = ['general', 'spear', 'archer', 'cavalry'];
+  // ======================= 過關模式 =======================
+  // 建立角色：四項能力各從 BASE 起，另有 POINTS 點自由分配 (每項 MIN–MAX)；初始士兵 START_UNITS 隊
+  // 營地：金錢買士兵 (最多 MAX_UNITS 隊，賣出退 SELL_RATE)；經驗值提升主將能力或兵種等級
+  S.CAMPAIGN = {
+    CREATE: { BASE: 50, POINTS: 40, MIN: 30, MAX: 85 },
+    START_UNITS: 5,
+    START_GOLD: 0,
+    MAX_UNITS: 9,
+    PRICE: { spear: 100, archer: 120, cavalry: 150 },
+    SELL_RATE: 0.5,
+    STAT_COST: 100,                // 主將能力 +STAT_STEP 需要的經驗值
+    STAT_STEP: 3,
+    STAT_MAX: 150,
+    LEVEL_COST: 100,               // 兵種升一級需要的經驗值
+    REPLAY_RATE: 0.5,              // 重打已過關卡的獎勵倍率
+    LOSS_EXP_RATE: 0.3             // 戰敗仍可獲得的經驗值比例 (沒有金錢)
+  };
+  S.STAT_NAMES = { hp: '體力', war: '武力', int: '智力', lead: '統率' };
+  S.STAT_KEYS = ['hp', 'war', 'int', 'lead'];
+  // 兵種等級：每級該兵種 HP / MP / 攻擊 / 防禦 / 智力 / 精神 +BONUS
+  S.LEVEL = { BONUS: 0.05, MAX: 40 };
+  // 升級費用遞增：前期都是 100 經驗，越高越貴 (噩夢 / 地獄的經驗值倍率很高，避免一下子升太多)
+  S.levelCost = function (lv) { return S.CAMPAIGN.LEVEL_COST + 25 * Math.max(0, lv - 5); };   // Lv5 以前都是 100
+  S.statCost = function (v) { return S.CAMPAIGN.STAT_COST + Math.max(0, v - 75) * 6; };       // 75 以前都是 100
+
+  // ---- 裝備 (品質、詞綴、套裝、暗金的資料與邏輯在 js/items.js) ----
+  // 仿暗黑破壞神 2 的 10 個裝備位置；物品部位 (ITEM_SLOTS) 只有 9 種，戒指可以戴兩枚
+  S.ITEM_SLOTS = { weapon: '武器', shield: '副手', helm: '頭盔', armor: '鎧甲', gloves: '護手',
+                   belt: '腰帶', boots: '戰靴・坐騎', amulet: '護符', ring: '戒指' };
+  S.ITEM_SLOT_KEYS = ['weapon', 'shield', 'helm', 'armor', 'gloves', 'belt', 'boots', 'amulet', 'ring'];
+  S.EQUIP_SLOTS = { helm: '頭盔', amulet: '護符', weapon: '武器', armor: '鎧甲', shield: '副手',
+                    ring1: '戒指', belt: '腰帶', ring2: '戒指', gloves: '護手', boots: '戰靴・坐騎' };
+  S.EQUIP_SLOT_KEYS = ['helm', 'amulet', 'weapon', 'armor', 'shield', 'ring1', 'belt', 'ring2', 'gloves', 'boots'];
+  S.equipKeysFor = function (itemSlot) { return itemSlot === 'ring' ? ['ring1', 'ring2'] : [itemSlot]; };
+
+  // 關卡：general 敵將能力，units 敵軍士兵，gold / exp 首次過關獎勵
+  // drops 首次過關額外獲得的裝備：{ quality: 'rare' } 隨機稀有、{ unique: id } 暗金、{ set: id } 套裝 (見 js/items.js)
+  // lv 敵軍等級：數字 = 全體同等級；也可以分別指定 { general, spear, archer, cavalry }
+  // diff：難度 (S.DIFFICULTIES 的 key)，敵軍全體再加上該難度的等級
+  S.stageLevels = function (st, diff) {
+    var lv = typeof st.lv === 'object' ? Object.assign({ general: 0, spear: 0, archer: 0, cavalry: 0 }, st.lv) :
+      { general: st.lv, spear: st.lv, archer: st.lv, cavalry: st.lv };
+    var D = diff ? S.DIFFICULTIES[diff] : null;
+    var bonus = D ? D.lv + Math.round(D.perStage * Math.max(0, S.STAGES.indexOf(st))) : 0;   // 越後面的關卡加越多
+    Object.keys(lv).forEach(function (k) { lv[k] += bonus; });
+    return lv;
+  };
+
+  // ---- 難度 (仿暗黑破壞神 2)：全破普通 10 關解鎖噩夢，全破噩夢解鎖地獄 ----
+  // lv：敵軍全體等級加成 (再加上 perStage × 關卡序號)  ilvl：掉落物品等級加成  reward：金錢 / 經驗倍率
+  // elite：一般出征時每隊敵兵成為精英的機率  campElite：探索模式每座敵營有精英的機率
+  S.DIFFICULTIES = {
+    normal:    { name: '普通', lv: 0,  perStage: 0.12,ilvl: 0,  reward: 1,   elite: 0.05, campElite: 0.5,  color: '#e8e8f0' },
+    nightmare: { name: '噩夢', lv: 5,  perStage: 0.65,ilvl: 10, reward: 2.5, elite: 0.15, campElite: 0.75, color: '#ff9040' },
+    hell:      { name: '地獄', lv: 10, perStage: 1.0, ilvl: 20, reward: 5,   elite: 0.25, campElite: 1,    color: '#ff4040' }
+  };
+  S.DIFFICULTY_KEYS = ['normal', 'nightmare', 'hell'];
+  S.STAGES = [
+    { title: '黃巾之亂', general: { name: '程遠志', hp: 45, war: 52, int: 20, lead: 30, beard: '#403020' },
+      units: ['spear', 'spear', 'archer', 'archer'], lv: 0, gold: 120, exp: 100 },
+    { title: '廣宗之戰', general: { name: '張寶', hp: 55, war: 45, int: 72, lead: 45, beard: '#202020' },
+      units: ['spear', 'spear', 'archer', 'archer', 'cavalry'], lv: 0, gold: 140, exp: 150 },
+    { title: '汜水關', general: { name: '華雄', hp: 80, war: 86, int: 35, lead: 60, beard: '#282018' },
+      units: ['spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 1 }, gold: 160, exp: 200, drops: [{ quality: 'rare' }] },
+    { title: '壽春討伐', general: { name: '紀靈', hp: 75, war: 82, int: 42, lead: 70, beard: null },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 180, exp: 250 },
+    { title: '白馬之圍', general: { name: '顏良', hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1 }, gold: 200, exp: 300, drops: [{ unique: 'dilu' }] },
+    { title: '延津之戰', general: { name: '文醜', hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 1, cavalry: 2 }, gold: 220, exp: 350, drops: [{ unique: 'warDrum' }] },
+    { title: '合肥之戰', general: { name: '張遼', hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 3 }, gold: 240, exp: 400 },
+    { title: '博望坡', general: { name: '夏侯惇', hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 4 }, gold: 260, exp: 450, drops: [{ unique: 'qinggang' }] },
+    { title: '樊城之戰', general: { name: '關羽', hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 4, cavalry: 4 }, gold: 300, exp: 500, drops: [{ set: 'dragonBlade' }] },
+    { title: '虎牢關', general: { name: '呂布', hp: 98, war: 100, int: 26, lead: 85, beard: null },
+      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 6, spear: 6, archer: 5, cavalry: 6 }, gold: 500, exp: 600, drops: [{ set: 'halberd' }, { set: 'redHare' }] }
+  ];
 
   // ---- 雙方軍隊 (hp=體力 war=武力 int=智力 lead=統率；統率提升士兵防禦) ----
   // 為了公平：預設兩軍兵種編成相同，武將能力取捨不同但總體戰力相當 (以 tools/simulate.js 驗證約 50:50)

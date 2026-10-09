@@ -13,21 +13,25 @@
     canvas.width = S.VIEW_W * S.SCALE;
     canvas.height = S.VIEW_H * S.SCALE;
     this.ctx = canvas.getContext('2d');
-    this.field = buildField();
+    this.field = buildField(S.MAP, false);
+    this.fieldMap = S.MAP;
+    this.cam = { x: 0, y: 0 };      // 鏡頭左上角 (邏輯像素)；探索模式跟著主將
     this.sprites = S.buildSprites();
     this.portraits = [];
     this.showBars = true;
     this.highlightId = -1;
-    this.drafting = false;          // 選將模式挑選中
+    this.caption = null;            // { title, sub }：營地預覽時蓋在戰場上的標題
+    this.commanding = false;        // 玩家正在操控主將
     this.aim = null;                // 計策瞄準預覽 { x, y, radius, color, targets }
     this.hoverChest = null;
   }
 
-  // ---- 磚地 + 城牆 (預先畫好) ----
-  function buildField() {
+  // ---- 地面 + 城牆 (預先畫好)：一般戰鬥是磚地，探索模式是草地 ----
+  function buildField(map, grass) {
+    var cols = map[0].length, rows = map.length;
     var c = document.createElement('canvas');
-    c.width = S.FIELD_W;
-    c.height = S.FIELD_H;
+    c.width = cols * S.TILE;
+    c.height = rows * S.TILE;
     var g = c.getContext('2d');
     var seed = 7;
     function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
@@ -44,12 +48,27 @@
         }
       }
     }
-    bricks(0, 0, S.FIELD_W, S.FIELD_H, ['#a8a8a8', '#a0a0a0', '#a4a4a4', '#b0b0b0', '#a0a0a0', '#8c8c8c'], '#888888');
+    if (grass) {
+      var GREENS = ['#5c8c3c', '#5a883a', '#60903e', '#56843a', '#5e8a40'];
+      for (var gy = 0; gy < c.height; gy += 8) {
+        for (var gx = 0; gx < c.width; gx += 8) {
+          g.fillStyle = GREENS[(rnd() * GREENS.length) | 0];
+          g.fillRect(gx, gy, 8, 8);
+        }
+      }
+      for (var k = 0; k < cols * rows * 1.5; k++) {   // 草叢與小花
+        var r = rnd();
+        g.fillStyle = r < 0.85 ? '#4a7830' : r < 0.95 ? '#78a050' : '#e8e080';
+        g.fillRect((rnd() * c.width) | 0, (rnd() * c.height) | 0, 1, r < 0.85 ? 2 : 1);
+      }
+    } else {
+      bricks(0, 0, c.width, c.height, ['#a8a8a8', '#a0a0a0', '#a4a4a4', '#b0b0b0', '#a0a0a0', '#8c8c8c'], '#888888');
+    }
 
-    function wall(x, y) { return x >= 0 && y >= 0 && x < S.COLS && y < S.ROWS && S.MAP[y][x] === '#'; }
+    function wall(x, y) { return x >= 0 && y >= 0 && x < cols && y < rows && map[y][x] === '#'; }
     var T = S.TILE;
-    for (var ty = 0; ty < S.ROWS; ty++) {
-      for (var tx = 0; tx < S.COLS; tx++) {
+    for (var ty = 0; ty < rows; ty++) {
+      for (var tx = 0; tx < cols; tx++) {
         if (!wall(tx, ty)) {
           // 城牆下方的陰影
           if (wall(tx, ty - 1)) { g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(tx * T, ty * T, T, 4); }
@@ -95,26 +114,188 @@
 
   // ---- 主繪製 ----
   Renderer.prototype.draw = function (battle, running) {
-    var g = this.ctx;
+    var g = this.ctx, T = S.TILE, cam = this.cam;
+    if (this.fieldMap !== battle.map) {             // 換地圖 (探索模式每次都是新的大地圖)
+      this.field = buildField(battle.map, !!battle.explore);
+      this.fieldMap = battle.map;
+      this.mini = null;
+    }
+    this.updateCamera(battle);
     g.setTransform(S.SCALE, 0, 0, S.SCALE, 0, 0);
     g.imageSmoothingEnabled = false;
-    g.drawImage(this.field, 0, 0);
-    this.drawChests(battle);
+    g.drawImage(this.field, cam.x, cam.y, S.FIELD_W, S.FIELD_H, 0, 0, S.FIELD_W, S.FIELD_H);
 
-    var list = battle.units.filter(function (u) { return !u.dead || u.deathT > 0; });
+    // 戰場上的東西以世界座標畫，鏡頭位移後裁切在戰場範圍內
+    g.save();
+    g.beginPath(); g.rect(0, 0, S.FIELD_W, S.FIELD_H); g.clip();
+    g.setTransform(S.SCALE, 0, 0, S.SCALE, -cam.x * S.SCALE, -cam.y * S.SCALE);
+    this.drawChests(battle);
+    this.drawPendings(battle);
+    var x0 = cam.x / T - 1, y0 = cam.y / T - 1, x1 = (cam.x + S.FIELD_W) / T + 1, y1 = (cam.y + S.FIELD_H) / T + 1;
+    function onScreen(x, y) { return x >= x0 && x <= x1 && y >= y0 && y <= y1; }
+    function shown(u) {           // 探索模式：看不到的敵人不畫
+      return onScreen(u.posX(), u.posY()) && (u.side === 0 || battle.isVisible(Math.round(u.posX()), Math.round(u.posY())));
+    }
+    var list = battle.units.filter(function (u) { return (!u.dead || u.deathT > 0) && shown(u); });
     list.sort(function (a, b) { return a.posY() - b.posY(); });
     for (var i = 0; i < list.length; i++) this.drawUnit(list[i], battle.time);
     for (var p = 0; p < battle.projectiles.length; p++) {
       var pr = battle.projectiles[p];
       if (pr.kind === 'orb') this.drawOrb(pr); else this.drawArrow(pr);
     }
-    for (var e = 0; e < battle.effects.length; e++) this.drawEffect(battle.effects[e]);
-    this.drawWeather(battle);
+    for (var e = 0; e < battle.effects.length; e++) {
+      var fx = battle.effects[e];
+      if (onScreen(fx.x, fx.y) && battle.isVisible(Math.round(fx.x), Math.round(fx.y))) this.drawEffect(fx);
+    }
     this.drawAim();
-    this.drawNotices(battle);
+    this.drawOrders(battle);
+    this.drawFocus(battle);
+    if (battle.explore) this.drawFog(battle, Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1));
+    g.restore();
 
+    this.drawWeather(battle);
+    this.drawNotices(battle);
+    if (battle.explore) this.drawMinimap(battle);
     this.drawPanel(battle);
     this.drawOverlay(battle, running);
+  };
+
+  // 預警範圍：紅色閃爍，越接近落下越濃
+  Renderer.prototype.drawPendings = function (battle) {
+    var g = this.ctx, T = S.TILE;
+    (battle.pendings || []).forEach(function (p) {
+      var k = Math.min(1, p.t / p.dur), x = (p.x - p.r) * T, y = (p.y - p.r) * T, w = (2 * p.r + 1) * T;
+      var blink = 0.5 + 0.5 * Math.sin(Date.now() / 60);
+      g.fillStyle = 'rgba(255,40,20,' + (0.12 + 0.35 * k) + ')';
+      g.fillRect(x, y, w, w);
+      g.fillStyle = 'rgba(255,60,30,' + (0.25 + 0.2 * blink) + ')';
+      var inner = w * k;                          // 由中心向外擴張的實心方塊 = 倒數
+      g.fillRect(x + (w - inner) / 2, y + (w - inner) / 2, inner, inner);
+      g.strokeStyle = 'rgba(255,' + Math.round(80 + 120 * blink) + ',60,0.95)';
+      g.lineWidth = 1;
+      g.strokeRect(x + 0.5, y + 0.5, w - 1, w - 1);
+    });
+  };
+
+  // 集火目標：旋轉的紅色準星
+  Renderer.prototype.drawFocus = function (battle) {
+    var f = battle.focus && battle.focus[0];
+    if (!f || f.dead || !battle.isVisible(f.x, f.y)) return;
+    var g = this.ctx, T = S.TILE, cx = f.posX() * T + 8, cy = f.posY() * T + 8, a = Date.now() / 300;
+    g.strokeStyle = '#ff4030';
+    g.lineWidth = 1;
+    for (var i = 0; i < 4; i++) {
+      var ang = a + i * Math.PI / 2, r = 10;
+      var px = cx + Math.cos(ang) * r, py = cy + Math.sin(ang) * r;
+      g.beginPath();
+      g.moveTo(px, py);
+      g.lineTo(px - Math.cos(ang) * 3 + Math.cos(ang + Math.PI / 2) * 2.5, py - Math.sin(ang) * 3 + Math.sin(ang + Math.PI / 2) * 2.5);
+      g.moveTo(px, py);
+      g.lineTo(px - Math.cos(ang) * 3 - Math.cos(ang + Math.PI / 2) * 2.5, py - Math.sin(ang) * 3 - Math.sin(ang + Math.PI / 2) * 2.5);
+      g.stroke();
+    }
+  };
+
+  // 鏡頭：探索模式以主將為中心 (邊界停住)；一般戰鬥固定在左上角
+  Renderer.prototype.updateCamera = function (battle) {
+    var cam = this.cam, T = S.TILE;
+    if (!battle.explore) { cam.x = cam.y = 0; return; }
+    var u = battle.generals[0];
+    if (!u || u.dead) u = battle.alive(0)[0];
+    if (!u) return;
+    var maxX = battle.cols * T - S.FIELD_W, maxY = battle.rows * T - S.FIELD_H;
+    cam.x = Math.round(Math.max(0, Math.min(maxX, u.posX() * T + T / 2 - S.FIELD_W / 2)));
+    cam.y = Math.round(Math.max(0, Math.min(maxY, u.posY() * T + T / 2 - S.FIELD_H / 2)));
+  };
+
+  // 戰爭迷霧：沒去過的地方全黑，去過但現在看不到的地方變暗
+  Renderer.prototype.drawFog = function (battle, x0, y0, x1, y1) {
+    var g = this.ctx, T = S.TILE, W = battle.cols;
+    for (var y = Math.max(0, y0); y <= Math.min(battle.rows - 1, y1); y++) {
+      for (var x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++) {
+        var i = y * W + x;
+        if (battle.vis[i]) continue;
+        g.fillStyle = battle.seen[i] ? 'rgba(0,0,0,0.45)' : '#000';
+        g.fillRect(x * T, y * T, T, T);
+      }
+    }
+  };
+
+  // 小地圖 (戰場右下角)：探索過的地形、我軍、看得到的敵人、寶箱、敵將據點、目前畫面範圍
+  Renderer.prototype.drawMinimap = function (battle) {
+    var g = this.ctx, W = battle.cols, H = battle.rows, now = Date.now();
+    if (!this.mini || now - this.miniT > 300) {
+      if (!this.mini) { this.mini = document.createElement('canvas'); this.mini.width = W; this.mini.height = H; }
+      this.miniT = now;
+      var mg = this.mini.getContext('2d'), img = mg.createImageData(W, H), d = img.data;
+      for (var i = 0; i < W * H; i++) {
+        var o = i * 4;
+        if (!battle.seen[i]) { d[o + 3] = 0; continue; }
+        var wall = battle.walls[i];
+        d[o] = wall ? 150 : 70; d[o + 1] = wall ? 150 : 110; d[o + 2] = wall ? 150 : 60; d[o + 3] = 230;
+      }
+      mg.putImageData(img, 0, 0);
+    }
+    var s = 0.75, mw = W * s, mh = H * s, mx = S.FIELD_W - mw - 4, my = S.FIELD_H - mh - 4;
+    g.fillStyle = 'rgba(0,0,0,0.55)';
+    g.fillRect(mx - 1, my - 1, mw + 2, mh + 2);
+    g.drawImage(this.mini, mx, my, mw, mh);
+    battle.chests.forEach(function (c) {
+      if (!battle.seen[c.y * W + c.x]) return;
+      g.fillStyle = c.loot ? '#f8a030' : '#f8d838';
+      g.fillRect(mx + c.x * s - 0.5, my + c.y * s - 0.5, 1.5, 1.5);
+    });
+    (battle.shrines || []).forEach(function (sh) {
+      if (sh.used || !battle.seen[sh.y * W + sh.x]) return;
+      g.fillStyle = S.SHRINES[sh.type].color;
+      g.fillRect(mx + sh.x * s - 1, my + sh.y * s - 1, 2, 2);
+    });
+    var boss = battle.explore.boss;
+    if (battle.seen[boss.y * W + boss.x] && battle.generalAlive(1)) this.text('★', mx + boss.x * s, my + boss.y * s, 6, '#ff5040', 'center', '#000');
+    battle.units.forEach(function (u) {
+      if (u.dead || (u.side === 1 && !battle.isVisible(u.x, u.y))) return;
+      g.fillStyle = u.side === 0 ? (u.isGeneral ? '#ffffff' : '#58a8f8') : '#ff4030';
+      var sz = u.isGeneral ? 2.5 : 1.5;
+      g.fillRect(mx + u.x * s - sz / 2, my + u.y * s - sz / 2, sz, sz);
+    });
+    g.strokeStyle = 'rgba(255,255,255,0.7)';
+    g.lineWidth = 0.5;
+    g.strokeRect(mx + this.cam.x / S.TILE * s, my + this.cam.y / S.TILE * s, S.FIELD_W / S.TILE * s, S.FIELD_H / S.TILE * s);
+  };
+
+  // ---- 玩家主將：操控中畫黃框；移動命令畫虛線與目的地 X，攻擊命令標出目標 ----
+  Renderer.prototype.drawOrders = function (battle) {
+    var u = battle.generals[0];
+    if (!u || u.dead) return;
+    var g = this.ctx, T = S.TILE;
+    var gx = u.posX() * T, gy = u.posY() * T;
+    var o = u.order;
+    if (o && (o.kind === 'move' || o.kind === 'attack')) {
+      var tx, ty;
+      if (o.kind === 'move') { tx = o.x * T; ty = o.y * T; } else { tx = o.target.posX() * T; ty = o.target.posY() * T; }
+      var color = o.kind === 'move' ? 'rgba(128,200,255,0.9)' : 'rgba(255,80,64,0.95)';
+      g.strokeStyle = color;
+      g.lineWidth = 1;
+      g.setLineDash([3, 2]);
+      g.beginPath();
+      g.moveTo(gx + 8, gy + 8);
+      g.lineTo(tx + 8, ty + 8);
+      g.stroke();
+      g.setLineDash([]);
+      g.beginPath();
+      if (o.kind === 'move') {
+        g.moveTo(tx + 4.5, ty + 4.5); g.lineTo(tx + 11.5, ty + 11.5);
+        g.moveTo(tx + 11.5, ty + 4.5); g.lineTo(tx + 4.5, ty + 11.5);
+      } else {
+        g.rect(tx - 0.5, ty - 0.5, T + 1, T + 1);
+      }
+      g.stroke();
+    }
+    if (this.commanding && Math.floor(Date.now() / 250) % 2 === 0) {   // 用真實時間閃爍，暫停中也看得到
+      g.strokeStyle = '#f8f040';
+      g.lineWidth = 1;
+      g.strokeRect(gx - 0.5, gy - 0.5, T + 1, T + 1);
+    }
   };
 
   // ---- 寶箱 (上下浮動、閃光)；派去撿的部隊畫一條虛線 ----
@@ -132,7 +313,22 @@
       g.stroke();
       g.setLineDash([]);
     });
+    (battle.shrines || []).forEach(function (sh) {
+      if (!battle.seen[sh.y * battle.cols + sh.x]) return;
+      var def = S.SHRINES[sh.type], x = sh.x * T, y = sh.y * T;
+      g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x + 2, y + 13, 12, 2);
+      g.fillStyle = '#707070'; g.fillRect(x + 3, y + 9, 10, 5);
+      g.fillStyle = '#a0a0a0'; g.fillRect(x + 4, y + 7, 8, 3);
+      if (sh.used) return;
+      var f = Math.sin(battle.time * 8 + sh.x) * 1.2;
+      g.fillStyle = def.color; g.globalAlpha = 0.35;
+      g.beginPath(); g.arc(x + 8, y + 4, 6, 0, Math.PI * 2); g.fill();
+      g.globalAlpha = 1;
+      g.beginPath(); g.ellipse(x + 8, y + 3.5 + f * 0.3, 2.5, 4 + f * 0.4, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#ffffff'; g.fillRect(x + 7.5, y + 3, 1, 3);
+    });
     battle.chests.forEach(function (c) {
+      if (battle.explore && !battle.seen[c.y * battle.cols + c.x]) return;
       var x = c.x * T, y = c.y * T + Math.round(Math.sin((battle.time - c.born) * 4) * 0.8);
       g.fillStyle = 'rgba(0,0,0,0.3)';
       g.fillRect(x + 3, c.y * T + 13, 10, 2);
@@ -242,6 +438,19 @@
     if (frame && u.type !== 'cavalry' && u.type !== 'general') y -= 1;
     x = Math.round(x); y = Math.round(y);
 
+    if (u.windup && !u.dead) {    // 敵將蓄力：紅色光暈
+      g.fillStyle = 'rgba(255,50,30,' + (0.35 + 0.3 * Math.sin(Date.now() / 50)) + ')';
+      g.beginPath(); g.arc(x + 8, y + 8, 11, 0, Math.PI * 2); g.fill();
+    }
+    if (u.invulnT > 0 && Math.floor(Date.now() / 40) % 2) g.globalAlpha = 0.5;   // 突進中無敵
+    if (u.quality && u.quality !== 'normal' && !u.dead) {   // 我軍士兵的品質：腳下的色條
+      g.fillStyle = S.QUALITIES[u.quality].color;
+      g.fillRect(x + 3, y + 14, 10, 1);
+    }
+    if (u.elite && !u.dead) {     // 精英：腳下閃動的紫色光環
+      g.fillStyle = 'rgba(200,110,255,' + (0.35 + 0.2 * Math.sin(time * 5)) + ')';
+      g.beginPath(); g.ellipse(x + 8, y + 14, 9, 3.5, 0, 0, Math.PI * 2); g.fill();
+    }
     var set = this.sprites[u.side][u.type];
     var img = (u.flashT > 0 || u.dead) ? set.flash[frame] : set.frames[frame];
     if (u.facing < 0) {
@@ -254,6 +463,7 @@
       g.drawImage(img, x, y);
     }
 
+    g.globalAlpha = 1;
     if (u.dead) return;
     if (this.showBars) {
       g.fillStyle = '#202020';
@@ -264,6 +474,8 @@
       g.fillRect(x + 2, y + 16.5, 12 * u.mp / u.maxMp, 1);
     }
     this.drawStatus(u, x, y, time);
+    if (u.elite) this.text(u.name, x + 8, y - 4, 4.5, '#e0a0ff', 'center', '#000');
+    if (u.wanderer) this.text('流浪武者 ' + S.soldierFullName(u.wanderer), x + 8, y - 4, 4.5, S.QUALITIES[u.wanderer.q].color, 'center', '#000');
     if (u.id === this.highlightId) {
       g.strokeStyle = '#f8f040';
       g.lineWidth = 1;
@@ -340,7 +552,17 @@
     var k = fx.t / fx.dur;
     var cx = fx.x * S.TILE + 8, cy = fx.y * S.TILE + 8;
     g.globalAlpha = Math.min(1, (1 - k) * 2);
-    if (fx.fx === 'text') {
+    if (fx.fx === 'trail') {
+      g.strokeStyle = fx.color;
+      g.lineWidth = 6 * (1 - k);
+      g.lineCap = 'round';
+      g.beginPath(); g.moveTo(cx, cy); g.lineTo(fx.x2 * S.TILE + 8, fx.y2 * S.TILE + 8); g.stroke();
+      g.lineCap = 'butt';
+    } else if (fx.fx === 'ring') {
+      g.strokeStyle = fx.color;
+      g.lineWidth = 3 * (1 - k) + 0.5;
+      g.beginPath(); g.arc(cx, cy, 6 + k * 18, 0, Math.PI * 2); g.stroke();
+    } else if (fx.fx === 'text') {
       this.text(fx.text, cx, cy - 6 - k * 8, 6, fx.color, 'center', '#000');
     } else if (fx.fx === 'boom') {
       // 陷阱爆炸：放射狀碎片
@@ -447,13 +669,11 @@
   };
 
   Renderer.prototype.drawOverlay = function (battle, running) {
-    if (this.drafting) {
-      this.banner('選將中', '請在下方挑選武將與士兵');
+    if (this.caption) {
+      this.banner(this.caption.title, this.caption.sub);
     } else if (battle.state === 'over') {
-      var title = battle.winner < 0 ? '平手' : battle.armies[battle.winner].name + '軍 勝利！';
-      this.banner(title, (battle.timedOut ? '時間到 · ' : '') + '按 R 或「重新開始」再戰一場');
-    } else if (!running && battle.time === 0) {
-      this.banner('三國志 · 戰鬥', '按 空白鍵 或「開始」');
+      var title = battle.winner < 0 ? '平手' : battle.winner === 0 ? '勝利！' : '敗北…';
+      this.banner(title, (battle.timedOut ? '時間到 · ' : '') + '戰果請看下方');
     } else if (!running) {
       this.banner('暫停');
     } else if (battle.time < 1.2) {

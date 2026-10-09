@@ -3,70 +3,85 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>三國志 自動戰鬥</title>
-  <link rel="stylesheet" href="css/style.css">
+  <title>三國志 霸王之路</title>
+  <!-- 檔案網址後面的 ?v= 是版本號：每次更新上線就改成新的日期，瀏覽器才不會混用快取裡的舊檔案 -->
+  <link rel="stylesheet" href="css/style.css?v=20261008">
 </head>
 <body>
   <main>
-    <h1>三國志 霸王的大陸 風格 · 自動戰鬥</h1>
+    <h1>三國志 霸王的大陸 風格 · 霸王之路</h1>
     <div id="account" class="account"></div>
-    <canvas id="screen"></canvas>
-    <div class="controls">
-      <button id="btn-start">▶ 開始</button>
-      <button id="btn-restart">↻ 重新開始</button>
-      <button id="btn-random">🎲 隨機編成</button>
-      <button id="btn-draft">⚔ 選將模式</button>
-      <label>速度
-        <select id="sel-speed">
-          <option value="1">1x</option>
-          <option value="2">2x</option>
-          <option value="4">4x</option>
-        </select>
-      </label>
-      <label><input type="checkbox" id="chk-bars" checked> 兵力條</label>
-      <label>操控
-        <select id="sel-control">
-          <option value="0">藍軍</option>
-          <option value="1">紅軍</option>
-          <option value="-1">觀戰 (雙方電腦)</option>
-        </select>
-      </label>
-    </div>
-    <div id="tactics" class="tactics">
-      <span id="tac-info" class="tac-info"></span>
-      <button id="btn-general" class="tac general"></button>
-      <span id="tac-buttons"></span>
-      <span id="tac-hint" class="tac-hint"></span>
-    </div>
-    <p class="help">槍兵 剋 騎兵 · 騎兵 剋 弓兵 · 弓兵 剋 槍兵（物理）｜ 魔法：智力 vs 精神，無視相剋<br>
-      空白鍵：開始 / 暫停　R：重新開始　選將模式：雙方從亂數武將與士兵中輪流挑選　滑鼠指向單位或表格列可對照<br>
-      計策：消耗軍令（隨時間累積、擊破敵隊 +1），數字鍵 1–4 施放，火計 / 落雷需點選戰場位置（右鍵或 Esc 取消）；Q：主將出陣 / 撤退（玩家方主將不會自行出陣）<br>
-      隨機事件：寶箱（點擊可派最近的士兵去撿，可能是陷阱！）、天候變化（大風助火、大雨滅火、濃霧縮短射程）、伏兵；暫停中也可以下令</p>
-    <ol id="events" class="events"></ol>
-    <section id="draft" hidden>
-      <div class="draft-head">
-        <span id="draft-turn"></span>
-        <button id="btn-draft-auto">🎲 代選</button>
-        <button id="btn-draft-cancel">✕ 取消</button>
+    <section id="create" class="panel" hidden></section>
+    <section id="camp" class="panel" hidden></section>
+    <section id="result" class="panel result" hidden></section>
+    <div id="field" class="field" hidden>
+      <div class="screen-wrap">
+        <canvas id="screen"></canvas>
+        <!-- 觸控裝置：半透明的方向搖桿，疊在戰場左下角 -->
+        <div class="dpad" aria-label="移動主將">
+          <span class="arrow up">▲</span><span class="arrow left">◀</span><span class="arrow right">▶</span><span class="arrow down">▼</span>
+          <span class="knob"></span>
+        </div>
       </div>
-      <div id="draft-picks"></div>
-      <h3>武將 <small>雙方各選一位</small></h3>
-      <div class="draft-table"><table id="draft-generals"></table></div>
-      <h3>士兵 <small>輪流挑選，各選五隊（防禦另受主將統率加成）</small></h3>
-      <div class="draft-table"><table id="draft-soldiers"></table></div>
-    </section>
-    <div id="roster"></div>
+      <div id="battle-bar" class="controls">
+        <button id="btn-start" hidden>⏸ 暫停</button>
+        <button id="btn-retreat" hidden>🏳 撤退</button>
+        <span class="speed" id="speed" title="戰鬥速度（快捷鍵 + / −）">速度
+          <button data-speed="1">1x</button><button data-speed="2">2x</button><button data-speed="4">4x</button><button data-speed="8">8x</button>
+        </span>
+        <button id="btn-sound" title="音效：大聲 / 小聲 / 靜音">🔊</button>
+        <label><input type="checkbox" id="chk-bars" checked> 兵力條</label>
+        <label title="開啟時由電腦判斷時機施放計策；關閉則完全由你手動施放"><input type="checkbox" id="chk-autotac" checked> 自動計策</label>
+      </div>
+      <div id="tactics" class="tactics">
+        <span id="tac-info" class="tac-info"></span>
+        <button id="btn-general" class="tac general"></button>
+        <button id="btn-command" class="tac general" title="點戰場上的地面讓主將走過去">點地移動<kbd>E</kbd></button>
+        <span id="tac-buttons"></span>
+        <span class="skillbar">
+          <button id="btn-dash" class="tac skill"></button>
+          <button id="btn-whirl" class="tac skill"></button>
+          <span class="stances" title="陣型">
+            <button data-stance="free" class="tac">自由<kbd>C</kbd></button><button data-stance="tight" class="tac">方陣<kbd>Z</kbd></button><button data-stance="spread" class="tac">散開<kbd>X</kbd></button>
+          </span>
+        </span>
+        <span id="tac-hint" class="tac-hint"></span>
+      </div>
+      <p class="help"><b>W A S D</b>（或方向鍵）移動主將，<b>滑鼠左鍵點敵人</b>讓主將攻擊該目標；放開方向鍵後主將原地固守<br>
+        ⚔ 技巧：<b>Shift 突進</b>（往滑鼠方向衝刺、途中無敵、撞暈敵人，可打斷敵將重擊）・<b>F 旋風斬</b>（擊退周圍敵人）・
+        <b>右鍵敵人：全軍集火</b>・陣型 <b>Z 方陣</b>（防禦 +20%、緊跟主將）／<b>X 散開</b>（範圍傷害減半）／<b>C 自由</b><br>
+        ⚠ 地上出現<span style="color:#ff6040">紅色範圍</span>是敵人的計策或敵將的蓄力重擊，趕快移開！從敵人<b>背後</b>攻擊傷害 +30%<br>
+        🗺 探索模式：走到寶箱上就會打開；靠近敵營會驚醒敵人，擊破敵營掉落裝備並有一隊陣亡士兵歸隊；
+        非戰鬥時部隊會慢慢回復；打倒敵將過關，主將陣亡則失敗（撿到的裝備都能帶走）；右下角是小地圖<br>
+        🤝 野外偶爾會遇到<b>流浪武者</b>（頭上有名字），打倒後有機率被收服、加入你的營舍；也可以到營地的<b>酒館</b>招募士兵<br>
+        🔥 神壇：踩上去獲得增益（攻擊、防禦、回復、經驗、財寶、軍令），每座只能用一次<br>
+        💜 精英敵人：紫色光環、生命 2 倍、帶有狂暴 / 疾風 / 石膚 / 吸血 / 火焰（死亡爆炸）/ 召喚等詞綴，擊倒必掉裝備<br>
+        😈 全破普通 10 關解鎖噩夢、全破噩夢解鎖地獄：敵人更強，掉落更高等級的裝備與新的暗金 / 套裝<br>
+        槍兵 剋 騎兵 · 騎兵 剋 弓兵 · 弓兵 剋 槍兵（物理）｜ 魔法：智力 vs 精神，無視相剋<br>
+        空白鍵：暫停 / 繼續　+ / −：調整速度　滑鼠指向單位或表格列可對照<br>
+        點地移動：點自己的主將或按 E，再點地面讓主將走過去（右鍵或 Esc 取消）；Q：主將交給電腦出陣 / 退回後方待命<br>
+        計策：消耗軍令（隨時間累積、擊破敵隊 +1），數字鍵 1–4 施放，火計 / 落雷需點選戰場位置（右鍵或 Esc 取消）<br>
+        隨機事件：寶箱（點擊可派最近的士兵去撿，可能是陷阱！）、天候變化（大風助火、大雨滅火、濃霧縮短射程）、伏兵；暫停中也可以下令</p>
+      <ol id="events" class="events"></ol>
+      <div id="roster"></div>
+    </div>
   </main>
 
-  <script src="js/config.js"></script>
-  <script src="js/sprites.js"></script>
-  <script src="js/battle.js"></script>
-  <script src="js/tactics.js"></script>
-  <script src="js/draft.js"></script>
-  <script src="js/render.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/config.js?v=20261008"></script>
+  <script src="js/items.js?v=20261008"></script>
+  <script src="js/soldiers.js?v=20261008"></script>
+  <script src="js/explore.js?v=20261008"></script>
+  <script src="js/sprites.js?v=20261008"></script>
+  <script src="js/battle.js?v=20261008"></script>
+  <script src="js/tactics.js?v=20261008"></script>
+  <script src="js/elites.js?v=20261008"></script>
+  <script src="js/skills.js?v=20261008"></script>
+  <script src="js/render.js?v=20261008"></script>
+  <script src="js/sound.js?v=20261008"></script>
+  <script src="js/main.js?v=20261008"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
-  <script src="js/supabase-config.js"></script>
-  <script src="js/account.js"></script>
+  <script src="js/supabase-config.js?v=20261008"></script>
+  <script src="js/account.js?v=20261008"></script>
+  <script src="js/campaign.js?v=20261008"></script>
 </body>
 </html>

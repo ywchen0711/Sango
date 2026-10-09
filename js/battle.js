@@ -60,24 +60,34 @@
       this.int = roll(st.int);
       this.spr = roll(st.spr);
     }
-    // 玩家等級加成 (opts.levels[side] = { general: 2, spear: 1, ... })
+    // 等級加成 (opts.levels[side] = { general: 2, spear: 1, ... }) 與裝備的全軍士兵加成 (army.troopBonus)
     var lv = battle.levels && battle.levels[side];
     this.level = (lv && lv[type]) || 0;
-    if (this.level) {
-      var mul = 1 + this.level * S.LEVEL.BONUS;
+    var named = preset && preset.name != null;   // 士兵角色 (soldiers.js)：能力已含等級，名字、技能等級、特效都由 preset 帶入
+    var bonus = (named ? 0 : this.level * S.LEVEL.BONUS) + (this.isGeneral ? 0 : army.troopBonus || 0);   // 士兵角色的等級已算在 preset 裡
+    if (bonus) {
+      var mul = 1 + bonus;
       var self = this;
       ['maxHp', 'maxMp', 'atk', 'def', 'int', 'spr'].forEach(function (k) { self[k] = Math.round(self[k] * mul); });
     }
+    if (named) {
+      this.name = preset.name;
+      this.named = true;
+      this.level = preset.lv || 0;
+      this.quality = preset.quality;
+      this.skillLv = preset.skillLv || null;
+      this.procs = preset.procs || null;
+    }
     this.hp = this.maxHp;
     this.mp = this.maxMp;
-    var nSkills = this.isGeneral ? S.GENERAL_SKILLS : 1;
+    var nSkills = this.isGeneral ? S.GENERAL_SKILLS : 2;   // 一般士兵物理 / 魔法各兩個 (和士兵角色的四個技能對等)
     this.physSkills = preset ? preset.physSkills.slice() : S.pickDistinct(S.PHYSICAL_SKILLS, nSkills, rng);
     this.magicSkills = preset ? preset.magicSkills.slice() : S.pickDistinct(S.MAGIC_SKILLS, nSkills, rng);
     this.buffs = [];   // { kind: 'stat'|'burn'|'stun', t: 剩餘秒數, ... }
-    this.range = st.range;
-    this.ranged = !!st.ranged;
-    this.moveTime = st.moveTime;
-    this.attackTime = st.attackTime;
+    this.range = named && preset.range ? preset.range : st.range;
+    this.ranged = named && preset.ranged != null ? preset.ranged : !!st.ranged;
+    this.moveTime = st.moveTime / (this.isGeneral ? 1 + (army.speedBonus || 0) : 1) * (named ? preset.moveMul || 1 : 1);   // 裝備：主將移動速度
+    this.attackTime = st.attackTime * (named ? preset.attackMul || 1 : 1);
     this.atkCd = battle.rng() * 0.6;
     this.thinkCd = battle.rng() * 0.4;
     this.retargetCd = 0;
@@ -85,6 +95,7 @@
     this.target = null;
     this.chestGoal = null;            // 正要去開的寶箱
     this.chestForced = false;         // 玩家下令：優先於交戰
+    this.order = null;                // 玩家手動操控主將的命令
     this.charged = false;
     this.engaged = !this.isGeneral;
     this.dead = false;
@@ -122,6 +133,7 @@
     this.rng = this.seed != null ? mulberry32(this.seed) : S.random;
     this.armies = armies;
     this.levels = opts.levels || null;
+    this.autoTactics = opts.autoTactics || [false, false];   // 玩家方的計策交給電腦判斷
     this.units = [];
     this.projectiles = [];
     this.effects = [];
@@ -131,25 +143,224 @@
     this.state = 'fighting';
     this.winner = -1;
     this.generals = [null, null];
+    // 地圖：一般戰鬥用 S.MAP；探索模式 (opts.explore，見 explore.js) 用產生的大地圖
+    this.explore = opts.explore || null;
+    this.map = this.explore ? this.explore.map : S.MAP;
+    this.cols = this.map[0].length;
+    this.rows = this.map.length;
+    this.timeLimit = this.explore ? Infinity : S.TIME_LIMIT;
+    this.ilvl = opts.ilvl || (this.explore && this.explore.ilvl) || 1;   // 精英、神壇掉落的物品等級
+    this.mf = opts.mf || 0;       // 尋寶 % (裝備的中綴)：戰鬥中掉落的裝備品質更好
+    this.lootFound = [];          // 這場戰鬥撿到的裝備 (精英掉落、探索的寶箱 / 敵營 / 神壇)
+    this.recruited = [];          // 被收服、願意加入的流浪武者 (soldiers.js 的士兵物件)
+    this.sfx = [];                // 音效事件 { n: 名稱, x, y }，由 main.js 取出播放 (Node 模擬時沒人取，會被截斷)
     this.initEvents(opts);
-    this.walls = new Array(S.COLS * S.ROWS);
-    this.occ = new Array(S.COLS * S.ROWS);
-    for (var y = 0; y < S.ROWS; y++) {
-      for (var x = 0; x < S.COLS; x++) {
-        this.walls[this.idx(x, y)] = S.MAP[y][x] === '#';
+    this.walls = new Array(this.cols * this.rows);
+    this.occ = new Array(this.cols * this.rows);
+    for (var y = 0; y < this.rows; y++) {
+      for (var x = 0; x < this.cols; x++) {
+        this.walls[this.idx(x, y)] = this.map[y][x] === '#';
         this.occ[this.idx(x, y)] = null;
       }
     }
-    this.deploy(0);
-    this.deploy(1);
+    if (this.explore) this.deployExplore();
+    else { this.deploy(0); this.deploy(1); }
+    if (opts.eliteChance && !this.explore) this.rollElites(opts.eliteChance);   // 一般出征：敵兵依機率成為精英
     this.order = this.units.map(function (u, i) { return i; });
   }
+
+  // ======================= 探索模式 =======================
+  // 我軍在起點附近；敵軍依 explore.spawns 配置 (camp 0 = 敵將據點)，一開始都在沉睡
+  Battle.prototype.deployExplore = function () {
+    var ex = this.explore, self = this;
+    var cells = ex.startCells.slice();
+    var mine = this.armies[0];
+    var g = this.addUnit(0, 'general', cells[0].x, cells[0].y, mine);
+    g.engaged = true;
+    g.order = { kind: 'hold' };   // 主將由玩家操控 (WASD 移動、點敵人攻擊)，不會自己衝出去
+    g.maxHp = g.hp = Math.round(g.maxHp * S.EXPLORE.HERO_HP);
+    mine.units.forEach(function (t, i) {
+      var c = cells[i + 1];
+      if (c) self.addUnit(0, typeof t === 'string' ? t : t.type, c.x, c.y, mine, typeof t === 'string' ? null : t);
+    });
+    ex.spawns.forEach(function (sp) {
+      var u = sp.wanderer ? self.addUnit(1, sp.type, sp.x, sp.y, self.armies[1], S.soldierStats(sp.wanderer))
+                          : self.addUnit(1, sp.type, sp.x, sp.y, self.armies[1]);
+      if (sp.wanderer) u.wanderer = sp.wanderer;
+      u.camp = sp.camp;
+      u.awake = false;
+      u.engaged = true;
+      if (sp.elite) self.makeElite(u, sp.elite);
+    });
+    this.shrines = (ex.shrines || []).map(function (sh) { return { x: sh.x, y: sh.y, type: sh.type, used: false }; });
+    this.units.forEach(function (u) { if (u.side === 0) u.awake = true; });
+    this.campLeft = {};
+    this.units.forEach(function (u) { if (u.side === 1) self.campLeft[u.camp] = (self.campLeft[u.camp] || 0) + 1; });
+    this.campsCleared = 0;
+    this.chests = ex.chests.map(function (c, i) {
+      return { id: i, x: c.x, y: c.y, loot: c.loot, item: c.loot ? 'loot' : null, open: true, born: 0 };
+    });
+    this.chests.forEach(function (c) { if (!c.loot) c.item = self.rollChestItem(); });
+    this.seen = new Uint8Array(this.cols * this.rows);   // 戰爭迷霧：探索過的格子
+    this.vis = new Uint8Array(this.cols * this.rows);    // 目前看得到的格子
+    this.updateVision();
+  };
+
+  Battle.prototype.unitsNear = function (side, x, y, r) {
+    var out = [];
+    for (var i = 0; i < this.units.length; i++) {
+      var o = this.units[i];
+      if (!o.dead && o.side === side && cheb(x, y, o.x, o.y) <= r) out.push(o);
+    }
+    return out;
+  };
+
+  // 主將跑太前面：附近的士兵不到一半就先等部隊跟上
+  Battle.prototype.armyLagging = function (g) {
+    var R = S.EXPLORE.COHESION, n = 0, near = 0;
+    for (var i = 0; i < this.units.length; i++) {
+      var o = this.units[i];
+      if (o.dead || o.side !== g.side || o.isGeneral) continue;
+      n++;
+      if (cheb(o.x, o.y, g.x, g.y) <= R) near++;
+    }
+    return n > 0 && near * 2 < n;
+  };
+
+  Battle.prototype.wakeCamp = function (camp) {
+    var first = true, self = this;
+    this.units.forEach(function (o) {
+      if (o.dead || o.side !== 1 || o.camp !== camp || o.awake) return;
+      o.awake = true;
+      o.thinkCd = self.rng() * 0.3;
+      if (first) { self.addText(o, '!', '#ff4040', 1.0, -0.6); self.sound('alert', o); first = false; }
+    });
+    if (camp === 0 && !this.bossAwake) {
+      this.bossAwake = true;
+      this.notify('敵將 ' + this.armies[1].name + ' 察覺了你！', '#ff6040');
+      this.sound('bossAlert');
+    }
+  };
+
+  // 擊破一座敵營：掉落一件裝備
+  Battle.prototype.checkCampCleared = function (camp, last) {
+    this.campLeft[camp]--;
+    if (this.campLeft[camp] > 0) return;
+    this.campsCleared++;
+    this.reinforce();
+    var item = S.rollLoot(this.explore.ilvl, this.mf);
+    this.lootFound.push(item);
+    var info = S.itemInfo(item);
+    this.addText(last, '戰利品!', S.QUALITIES[info.q].color, 1.6, -0.6);
+    this.notify('擊破敵營！獲得【' + S.QUALITIES[info.q].name + '】' + info.name, S.QUALITIES[info.q].color);
+    this.sound('loot_' + info.q);
+  };
+
+  // 流浪武者被打倒：有機率被收服，戰鬥結束後加入營舍
+  Battle.prototype.tryRecruit = function (e) {
+    var sol = e.wanderer, chance = S.EXPLORE.RECRUIT_CHANCE[sol.q] || 0.3;
+    if (this.rng() < chance) {
+      this.recruited.push(sol);
+      this.addText(e, '願意加入!', '#80ff80', 2.0, -1.0);
+      this.notify(S.soldierFullName(sol) + '（' + S.CLASSES[sol.cls].name + '）被你的武勇折服，願意加入！', '#80ff80');
+      this.sound(sol.q === 'unique' ? 'loot_unique' : 'shrine', e);
+    } else {
+      this.notify(S.soldierFullName(sol) + ' 敗走了…', '#a0a0b0');
+    }
+  };
+
+  // 援軍：一隊陣亡的士兵帶著一半兵力回到主將身邊
+  Battle.prototype.reinforce = function () {
+    var g = this.generals[0];
+    if (!g || g.dead) return;
+    var u = null;
+    for (var i = 0; i < this.units.length; i++) {
+      var o = this.units[i];
+      if (o.side === 0 && o.dead && !o.isGeneral) { u = o; break; }
+    }
+    if (!u) return;
+    for (var r = 1; r <= 4; r++) {
+      for (var y = g.y - r; y <= g.y + r; y++) {
+        for (var x = g.x - r; x <= g.x + r; x++) {
+          if (cheb(x, y, g.x, g.y) !== r || !this.isFree(x, y, null) || this.chestAt(x, y)) continue;
+          u.dead = false; u.deathT = 0; u.buffs = []; u.target = null; u.chestGoal = null;
+          u.hp = Math.round(u.maxHp * 0.5); u.mp = 0;
+          u.x = u.fromX = x; u.y = u.fromY = y; u.moveT = u.moveDur = 0;
+          this.occ[this.idx(x, y)] = u;
+          this.addText(u, '援軍!', '#80c0ff', 1.4, -0.6);
+          this.notify(u.name + ' 歸隊了！', '#80c0ff');
+          this.sound('reinforce');
+          return;
+        }
+      }
+    }
+  };
+
+  // 探索模式的思考：回傳這個單位要考慮的敵人；回傳 null 表示這次思考已處理完 (沉睡 / 跟隨 / 回營)
+  Battle.prototype.exploreThink = function (u) {
+    var E = S.EXPLORE;
+    if (u.side === 1) {
+      if (!u.awake) {
+        if (this.unitsNear(0, u.x, u.y, E.AGGRO).length) this.wakeCamp(u.camp);
+        else { u.thinkCd = 0.4 + this.rng() * 0.3; return null; }
+      }
+      var far = cheb(u.x, u.y, u.homeX, u.homeY) > E.LEASH;
+      var foes = far ? [] : this.unitsNear(0, u.x, u.y, E.CHASE);
+      if (foes.length) return foes;
+      // 附近沒有我軍：回營，到家後恢復沉睡並回滿兵力
+      if (u.x === u.homeX && u.y === u.homeY) { u.awake = false; u.hp = u.maxHp; u.target = null; u.thinkCd = 0.5; return null; }
+      if (!this.stepToward(u, { x: u.homeX, y: u.homeY })) {
+        if (cheb(u.x, u.y, u.homeX, u.homeY) <= 1) { u.awake = false; u.hp = u.maxHp; }
+        u.thinkCd = 0.4;
+      }
+      return null;
+    }
+    var near = this.unitsNear(1, u.x, u.y, E.ENGAGE);
+    var f = this.focus[0];        // 集火目標：稍遠也會去打
+    if (f && !f.dead && !u.isGeneral && cheb(f.x, f.y, u.x, u.y) <= E.CHASE && near.indexOf(f) < 0) near.push(f);
+    if (u.order) return this.alive(1);
+    if (near.length) return near;
+    if (u.chestGoal && u.chestGoal.open && this.stepToward(u, u.chestGoal)) return null;
+    // 附近沒有敵人：士兵跟著主將走
+    var g = this.generals[0];
+    if (!u.isGeneral && g && !g.dead && cheb(u.x, u.y, g.x, g.y) > E.FOLLOW) {
+      var step = this.bfsStep(u, function (cx, cy) { return cheb(cx, cy, g.x, g.y) <= 2; }, g, 2500);
+      if (step) { this.moveTo(u, step.x, step.y); return null; }
+    }
+    u.thinkCd = 0.25 + this.rng() * 0.15;
+    return null;
+  };
+
+  // 視野：我軍附近 VISION 格內看得到，並記錄為探索過
+  Battle.prototype.updateVision = function () {
+    var R = S.EXPLORE.VISION, W = this.cols, H = this.rows, vis = this.vis, seen = this.seen;
+    vis.fill(0);
+    for (var i = 0; i < this.units.length; i++) {
+      var u = this.units[i];
+      if (u.dead || u.side !== 0) continue;
+      for (var y = Math.max(0, u.y - R); y <= Math.min(H - 1, u.y + R); y++) {
+        for (var x = Math.max(0, u.x - R); x <= Math.min(W - 1, u.x + R); x++) {
+          var dx = x - u.x, dy = y - u.y;
+          if (dx * dx + dy * dy <= R * R + R) { vis[y * W + x] = 1; seen[y * W + x] = 1; }
+        }
+      }
+    }
+  };
+  Battle.prototype.isVisible = function (x, y) {
+    return !this.explore || (this.inBounds(x, y) && this.vis[this.idx(x, y)] === 1);
+  };
+
+  // 登記音效事件 (at：發生的位置，可省略)
+  Battle.prototype.sound = function (name, at) {
+    if (this.sfx.length > 60) this.sfx.splice(0, 30);
+    this.sfx.push({ n: name, x: at ? at.x : null, y: at ? at.y : null });
+  };
 
   // 是否由玩家操控 (主將不會自行出陣，計策由玩家施放)
   Battle.prototype.isHuman = function (side) { return !!this.control[side]; };
 
-  Battle.prototype.idx = function (x, y) { return y * S.COLS + x; };
-  Battle.prototype.inBounds = function (x, y) { return x >= 0 && y >= 0 && x < S.COLS && y < S.ROWS; };
+  Battle.prototype.idx = function (x, y) { return y * this.cols + x; };
+  Battle.prototype.inBounds = function (x, y) { return x >= 0 && y >= 0 && x < this.cols && y < this.rows; };
   Battle.prototype.isWall = function (x, y) { return !this.inBounds(x, y) || this.walls[this.idx(x, y)]; };
   Battle.prototype.isFree = function (x, y, self) {
     if (this.isWall(x, y)) return false;
@@ -172,14 +383,14 @@
     function place(type, preset) {
       var slots = S.FORMATION[type] || [];
       for (var i = 0; i < slots.length; i++) {
-        var x = side === 0 ? slots[i][0] : S.COLS - 1 - slots[i][0];
+        var x = side === 0 ? slots[i][0] : self.cols - 1 - slots[i][0];
         var y = slots[i][1];
         if (self.isFree(x, y, null)) return self.addUnit(side, type, x, y, army, preset);
       }
       // 陣型格用完：找己方半場任一空格
-      for (var cx = 0; cx < S.COLS / 2; cx++) {
-        for (var cy = 0; cy < S.ROWS; cy++) {
-          var px = side === 0 ? cx : S.COLS - 1 - cx;
+      for (var cx = 0; cx < self.cols / 2; cx++) {
+        for (var cy = 0; cy < self.rows; cy++) {
+          var px = side === 0 ? cx : self.cols - 1 - cx;
           if (self.isFree(px, cy, null)) return self.addUnit(side, type, px, cy, army, preset);
         }
       }
@@ -213,7 +424,7 @@
   Battle.prototype.step = function (dt) {
     if (this.state === 'fighting') {
       this.time += dt;
-      if (this.time >= S.TIME_LIMIT) this.timeUp();
+      if (this.time >= this.timeLimit) this.timeUp();
       else this.updateEvents(dt);
     }
     // 每步打亂行動順序，避免固定某一方先動
@@ -256,6 +467,8 @@
         u.fromX = u.x; u.fromY = u.y; u.moveT = u.moveDur = 0;
         var chest = this.chestAt(u.x, u.y);
         if (chest) this.openChest(u, chest);
+        var shrine = this.shrines && this.shrineAt(u.x, u.y);
+        if (shrine) this.touchShrine(u, shrine);
       }
       return;
     }
@@ -273,9 +486,19 @@
   Battle.prototype.think = function (u) {
     var enemies = this.alive(1 - u.side);
     if (!enemies.length) return;
+    if (this.explore) {
+      enemies = this.exploreThink(u);
+      if (!enemies) return;
+    }
+    if (u.elite) this.eliteThink(u, enemies);
+    if (u.isGeneral && u.side === 1 && this.slamThink(u, enemies)) return;   // 敵將蓄力重擊
+    if (!u.isGeneral) { enemies = this.stanceFilter(u, enemies); if (!enemies) return; }   // 方陣
 
-    // 主將：玩家操控時待命到下令出陣 (只反擊射程內的敵人)
-    if (!u.engaged && this.isHuman(u.side)) {
+    // 玩家手動下令的主將 (移動 / 攻擊 / 固守，見 tactics.js)
+    if (u.order) { this.followOrder(u, enemies); return; }
+
+    // 主將：玩家按 Q 下令待命時退回後方 (只反擊射程內的敵人)；沒下令時和電腦一樣自行判斷出陣
+    if (!u.engaged && this.isHuman(u.side) && u.held) {
       if (!this.tryAttack(u, enemies)) this.walkHome(u);
       return;
     }
@@ -354,6 +577,7 @@
       var e = list[i];
       var s = S.matchup(u.type, e.type) + (1 - e.hp / e.maxHp) * 0.5 + (e.isGeneral ? 0.3 : 0);
       if (e === u.target) s += 0.2;
+      if (this.focus && e === this.focus[u.side] && !u.isGeneral) s += 5;   // 集火
       if (s > bestScore) { bestScore = s; best = e; }
     }
     return best;
@@ -361,7 +585,9 @@
 
   // 全域選目標：實際路徑距離 / 相剋偏好，並避免全部擠同一個目標
   Battle.prototype.chooseTarget = function (u, enemies) {
-    var field = this.distanceField(u.x, u.y);
+    var focus = this.focus && this.focus[u.side];
+    if (focus && !focus.dead && !u.isGeneral && enemies.indexOf(focus) >= 0) return focus;   // 集火
+    var field = this.distanceField(u.x, u.y, this.explore ? S.EXPLORE.CHASE + 6 : null);
     var allies = this.alive(u.side);
     var best = null, bestScore = Infinity;
     for (var i = 0; i < enemies.length; i++) {
@@ -380,13 +606,15 @@
     return best;
   };
 
-  // 只考慮城牆的 BFS 距離場
-  Battle.prototype.distanceField = function (sx, sy) {
-    var field = new Array(S.COLS * S.ROWS).fill(-1);
+  // 只考慮城牆的 BFS 距離場；maxD：只展開到這個距離 (大地圖省時間)
+  Battle.prototype.distanceField = function (sx, sy, maxD) {
+    var W = this.cols;
+    var field = new Array(W * this.rows).fill(-1);
     var q = [this.idx(sx, sy)];
     field[q[0]] = 0;
     for (var h = 0; h < q.length; h++) {
-      var c = q[h], cx = c % S.COLS, cy = (c / S.COLS) | 0;
+      var c = q[h], cx = c % W, cy = (c / W) | 0;
+      if (maxD != null && field[c] >= maxD) continue;
       for (var d = 0; d < 8; d++) {
         if (!this.canStep(cx, cy, DIRS[d][0], DIRS[d][1], null, true)) continue;
         var n = this.idx(cx + DIRS[d][0], cy + DIRS[d][1]);
@@ -401,26 +629,30 @@
   // BFS (避開其他單位) 找到能攻擊目標的格子，回傳第一步
   Battle.prototype.pathStep = function (u, target) {
     var self = this;
-    return this.bfsStep(u, function (cx, cy) { return self.inRangeAt(u, cx, cy, target); }, target);
+    return this.bfsStep(u, function (cx, cy) { return self.inRangeAt(u, cx, cy, target); }, target,
+      this.explore && !u.isGeneral ? 3000 : null);   // 大地圖上士兵只找附近；主將的命令要能走遠路
   };
 
   // BFS 找到第一個符合 goal(x, y) 的格子，回傳第一步；走不到就朝 fallback 貪婪靠近
-  Battle.prototype.bfsStep = function (u, goal, fallback) {
-    var N = S.COLS * S.ROWS;
-    var prev = new Array(N).fill(-2);
+  // maxNodes：最多展開幾格 (大地圖上一般士兵只找附近，主將的移動命令不限制)
+  Battle.prototype.bfsStep = function (u, goal, fallback, maxNodes) {
+    var W = this.cols;
+    var prev = new Array(W * this.rows).fill(-2);
     var start = this.idx(u.x, u.y);
     prev[start] = -1;
     var q = [start];
-    for (var h = 0; h < q.length; h++) {
-      var c = q[h], cx = c % S.COLS, cy = (c / S.COLS) | 0;
+    var limit = maxNodes || Infinity;
+    for (var h = 0; h < q.length && h < limit; h++) {
+      var c = q[h], cx = c % W, cy = (c / W) | 0;
       if (c !== start && goal(cx, cy)) {
         while (prev[c] !== start) c = prev[c];
-        return { x: c % S.COLS, y: (c / S.COLS) | 0 };
+        return { x: c % W, y: (c / W) | 0 };
       }
       var order = this.shuffledDirs();
       for (var d = 0; d < 8; d++) {
         var dx = order[d][0], dy = order[d][1];
-        if (!this.canStep(cx, cy, dx, dy, u, false)) continue;
+        if (!this.canStep(cx, cy, dx, dy, u, false) &&
+            !(c === start && this.canSwap(u, cx + dx, cy + dy) && this.canStep(cx, cy, dx, dy, u, true))) continue;
         var n = this.idx(cx + dx, cy + dy);
         if (prev[n] !== -2) continue;
         prev[n] = c;
@@ -430,9 +662,17 @@
     return this.greedyStep(u, fallback);
   };
 
+  // 探索模式的主將可以和身旁沒在移動的我方士兵交換位置 (不會被自己的部隊困住)
+  Battle.prototype.canSwap = function (u, x, y) {
+    if (!u.isGeneral || !this.inBounds(x, y) || !(this.explore || (u.order && u.order.kind === 'walk'))) return false;
+    var o = this.occ[this.idx(x, y)];
+    return !!o && o !== u && o.side === u.side && !o.isMoving() && !o.dead;
+  };
+
   // 路被擋住：沿著 (忽略單位的) 距離場往目標靠近一步
   Battle.prototype.greedyStep = function (u, target) {
-    var field = this.distanceField(target.x, target.y);
+    var field = this.distanceField(target.x, target.y,
+      this.explore && !u.isGeneral ? Math.max(Math.abs(u.x - target.x), Math.abs(u.y - target.y)) + 12 : null);
     var cur = field[this.idx(u.x, u.y)];
     var best = null, bestD = cur;
     var order = this.shuffledDirs();
@@ -471,14 +711,25 @@
   };
 
   Battle.prototype.moveTo = function (u, nx, ny) {
-    this.occ[this.idx(u.x, u.y)] = null;
+    var other = this.occ[this.idx(nx, ny)];
+    if (other && other !== u && this.canSwap(u, nx, ny)) {
+      // 和我方士兵交換位置：士兵退到主將原本的格子
+      this.occ[this.idx(u.x, u.y)] = other;
+      other.fromX = other.x; other.fromY = other.y;
+      other.x = u.x; other.y = u.y;
+      other.moveT = 0;
+      other.moveDur = other.moveTime;
+      other.thinkCd = Math.max(other.thinkCd, 0.3);
+    } else {
+      this.occ[this.idx(u.x, u.y)] = null;
+    }
     this.occ[this.idx(nx, ny)] = u;
     var diag = nx !== u.x && ny !== u.y;
     u.fromX = u.x; u.fromY = u.y;
     if (nx !== u.x) u.facing = sign(nx - u.x);
     u.x = nx; u.y = ny;
     u.moveT = 0;
-    u.moveDur = u.moveTime * (diag ? 1.3 : 1);
+    u.moveDur = u.moveTime * (diag ? 1.3 : 1) * (u.findBuff('slow') ? 1.5 : 1);   // 緩速
     u.charged = u.type === 'cavalry';
     u.thinkCd = 0;
   };
@@ -489,31 +740,36 @@
   var MAGIC_COLOR = '#c080ff';
 
   Battle.prototype.attack = function (u, e) {
-    u.atkCd = u.attackTime * (0.9 + this.rng() * 0.2);
+    u.atkCd = u.attackTime * (0.9 + this.rng() * 0.2) * (u.findBuff('slow') ? 1.5 : 1);   // 緩速
 
     // 隨機決定物理或魔法，再判定是否發動特技
     var magic = this.rng() < u.int / (u.atk + u.int);
     var pool = magic ? u.magicSkills : u.physSkills;
-    var sk = S.SKILLS[pool[(this.rng() * pool.length) | 0]];
+    var skId = pool.length ? pool[(this.rng() * pool.length) | 0] : null;
+    var sk = skId ? S.SKILLS[skId] : null;
+    var skLv = (u.skillLv && skId && u.skillLv[skId]) || 1;   // 士兵的技能等級：威力 +6% / 級、發動率 +0.5% / 級
     var skill = null;
-    if (u.mp >= sk.mp && this.rng() < S.SKILL_CHANCE) {
+    if (sk && u.mp >= sk.mp && this.rng() < S.SKILL_CHANCE + 0.005 * (skLv - 1)) {
       if (sk.support) {
+        u.skillMul = 1 + 0.06 * (skLv - 1);
         if (this.castSupport(u, sk)) { u.mp -= sk.mp; this.countSkill(sk); u.charged = false; return; }
       } else {
         skill = sk;
         u.mp -= sk.mp;
         this.countSkill(sk);
         this.addText(u, sk.name, magic ? MAGIC_SKILL_COLOR : PHYS_SKILL_COLOR, 1.0, -0.5);
+        this.sound(magic ? 'skillMagic' : 'skillPhys', u);
       }
     }
 
-    var hit = { magic: magic, skill: skill, mul: 1 };
+    var hit = { magic: magic, skill: skill, mul: skill ? 1 + 0.06 * (skLv - 1) : 1 };
     var adjacent = cheb(u.x, u.y, e.x, e.y) <= 1;
-    if (!magic && u.ranged && adjacent) hit.mul *= S.UNIT_TYPES[u.type].meleePenalty;
+    if (!magic && u.ranged && adjacent) hit.mul *= S.UNIT_TYPES[u.type].meleePenalty || 0.5;
     if (!magic && u.charged) hit.mul *= S.UNIT_TYPES.cavalry.chargeBonus;
     u.charged = false;
 
     if (magic || (u.ranged && !adjacent)) {
+      this.sound(magic ? 'magic' : 'arrow', u);
       var dist = euclid(u.x, u.y, e.x, e.y);
       this.projectiles.push({
         sx: u.x, sy: u.y, tx: e.x, ty: e.y, t: 0, dur: 0.1 + dist * (magic ? 0.1 : 0.07),
@@ -521,6 +777,7 @@
         src: u, target: e, hit: hit, side: u.side
       });
     } else {
+      this.sound('hit', u);
       u.lungeT = S.LUNGE_TIME;
       u.lungeDx = sign(e.x - u.x);
       u.lungeDy = sign(e.y - u.y);
@@ -539,12 +796,24 @@
         if (o !== e && cheb(o.x, o.y, e.x, e.y) <= sk.area) targets.push(o);
       });
     }
+    // 主將的中綴特效 (裝備)：破甲、致命一擊、吸血、燃燒 / 混亂 / 緩速
+    var procs = u.procs || (u.isGeneral && this.armies[u.side] && this.armies[u.side].procs);   // 士兵也可以有特效
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
       for (var h = 0; h < (sk.hits || 1) && !t.dead; h++) {
-        this.applyDamage(t, this.calcDamage(u, t, hit.magic, power, sk.ignoreDef || 0), hit.magic ? '#e0b0ff' : null);
+        var ignore = Math.min(0.9, (sk.ignoreDef || 0) + (procs && !hit.magic ? procs.pierce / 100 : 0));
+        var dmg = this.calcDamage(u, t, hit.magic, power, ignore);
+        if (t !== e) dmg = Math.max(1, Math.round(dmg * this.aoeMul(t)));   // 範圍波及 (散開陣型減半)
+        if (procs && procs.crit && this.rng() < procs.crit / 100) {
+          dmg *= 2;
+          this.addText(t, '致命!', '#ff4060', 0.9, -0.9);
+        }
+        this.applyDamage(t, dmg, hit.magic ? '#e0b0ff' : null);
+        if (u.elite) this.eliteOnHit(u, dmg);
+        if (procs && procs.leech && !u.dead) u.hp = Math.min(u.maxHp, u.hp + dmg * procs.leech / 100);
       }
       if (t.dead) continue;
+      if (procs) this.applyProcs(u, t, procs);
       if (sk.debuff) {
         this.addBuff(t, { kind: 'stat', stat: sk.debuff.stat, mul: sk.debuff.mul, t: sk.debuff.dur });
         this.addText(t, sk.debuff.label, '#80b0ff', 0.9, -0.4);
@@ -570,9 +839,10 @@
         if (r < low && cheb(a.x, a.y, u.x, u.y) <= S.SUPPORT_RANGE) { low = r; best = a; }
       });
       if (!best) return false;
-      var amt = u.stat('int') * sk.heal * (0.85 + this.rng() * 0.3);
+      var amt = u.stat('int') * sk.heal * (u.skillMul || 1) * (0.85 + this.rng() * 0.3);
       amt = Math.max(1, Math.round(amt));
       best.hp = Math.min(best.maxHp, best.hp + amt);
+      this.sound('heal', best);
       this.addText(best, '+' + amt, '#60ff90', 0.9);
       this.addBurst(best, sk.color);
     } else if (sk.buff) {
@@ -585,6 +855,7 @@
         self.addBurst(a, sk.color);
       });
       this.addText(u, sk.buff.label, sk.color, 0.9, -0.4);
+      this.sound('rally', u);
     } else {
       return false;
     }
@@ -600,17 +871,43 @@
       base = u.stat('int'); guard = e.stat('spr'); matchup = 1;
     } else {
       base = u.stat('atk'); guard = e.stat('def') * (1 - ignoreDef); matchup = S.matchup(u.type, e.type);
+      // 背擊：從目標面向的反方向攻擊
+      if (u.x != null && e.facing && u.x !== e.x && (u.x - e.x) * e.facing < 0) {
+        mul *= S.BACKSTAB;
+        if (u.side === 0 && this.rng() < 0.35) this.addText(e, '背擊!', '#ffb040', 0.7, -0.9);
+      }
+    }
+    // 陣型：散開的士兵攻擊 -10%、方陣的士兵防禦 +20%
+    if (this.stance) {
+      if (!u.isGeneral && this.stance[u.side] === 'spread') mul *= S.STANCES.spread.atk;
+      if (!e.isGeneral && this.stance[e.side] === 'tight') guard *= S.STANCES.tight.def;
     }
     var dmg = base * strength * matchup * (14 / (guard + 4)) * morale * mul * (0.85 + this.rng() * 0.3);
+    if (!isFinite(dmg)) dmg = 1;
     return Math.max(1, Math.round(dmg));
   };
 
   Battle.prototype.applyDamage = function (e, dmg, color) {
     if (e.dead) return;
+    if (e.invulnT > 0) return;    // 突進中無敵
+    if (this.explore && !e.awake) this.wakeCamp(e.camp);   // 被打就醒來
     e.hp -= dmg;
     e.flashT = 0.12;
     this.addText(e, '-' + dmg, color || (e.side === 0 ? '#a8d8ff' : '#ffc8a8'), 0.8);
     if (e.hp <= 0) this.kill(e);
+  };
+
+  // 中綴特效：依機率讓目標燃燒 / 混亂 / 緩速
+  Battle.prototype.applyProcs = function (u, t, procs) {
+    if (procs.burn && this.rng() < procs.burn / 100) this.applyBurn(u, t, { ratio: 0.3, dur: 3 });
+    if (procs.stun && !t.findBuff('stun') && this.rng() < procs.stun / 100) {
+      this.addBuff(t, { kind: 'stun', t: 1 });
+      this.addText(t, '雷霆', '#ffff80', 0.8, -0.4);
+    }
+    if (procs.slow && this.rng() < procs.slow / 100) {
+      if (!t.findBuff('slow')) this.addText(t, '緩速', '#80d0ff', 0.8, -0.4);
+      this.addBuff(t, { kind: 'slow', t: 2 });
+    }
   };
 
   // 同類狀態只保留一個 (重新施放會刷新時間)
@@ -656,17 +953,26 @@
     this.occ[this.idx(e.x, e.y)] = null;
     if (this.generalAlive(1 - e.side)) this.gainCommand(1 - e.side, S.COMMAND.PER_KILL);
     var army = this.armies[e.side];
+    this.sound(e.isGeneral ? 'generalDeath' : 'death', e);
     if (e.isGeneral) {
       this.addText(e, army.name + ' 陣亡', '#ff5040', 1.6);
       this.log.push(this.time.toFixed(1) + 's ' + army.name + ' 陣亡');
     } else {
       this.log.push(this.time.toFixed(1) + 's ' + army.name + '軍 ' + e.name + ' 潰滅');
     }
+    if (e.elite) this.eliteOnKill(e);
+    if (e.wanderer) this.tryRecruit(e);
+    else if (this.explore && e.side === 1 && e.camp > 0) this.checkCampCleared(e.camp, e);
     this.checkVictory();
   };
 
   Battle.prototype.checkVictory = function () {
     if (this.state !== 'fighting') return;
+    if (this.explore) {           // 探索：我方主將陣亡就輸，打倒敵將就贏
+      if (!this.generalAlive(0)) { this.state = 'over'; this.winner = 1; }
+      else if (!this.generalAlive(1)) { this.state = 'over'; this.winner = 0; }
+      return;
+    }
     var a0 = this.alive(0).length, a1 = this.alive(1).length;
     if (a0 && a1) return;
     this.state = 'over';
@@ -697,6 +1003,7 @@
       if (u.isGeneral) s.hp = u.hp;
       else s[u.type] += u.hp;
     });
+    Object.keys(s).forEach(function (k) { s[k] = Math.ceil(s[k]); });   // 探索模式的回復會產生小數
     return s;
   };
 

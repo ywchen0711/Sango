@@ -5,7 +5,8 @@
 (function (S) {
   'use strict';
 
-  var COMMON = { s: '#f8b878', w: '#ffffff', k: '#a05818', y: '#f8d838' };
+  var COMMON = { s: '#f8b878', w: '#ffffff', k: '#a05818', y: '#f8d838',
+                 r: '#d8a050', R: '#8a5a24', p: '#f8d020', n: '#2a2a38', N: '#4a4a5a', e: '#a0a8b8', E: '#686e80', t: '#f8f0d8' };
 
   S.SIDE_PALETTES = [
     { o: '#181828', a: '#f0f0f8', b: '#6888e8', h: '#b87030', H: '#683810' },
@@ -235,11 +236,226 @@
   };
 
   // 動物 (探索模式的野外)：毛色固定，不分陣營
+
+  // ---- 敵軍特殊兵種與新的野獸 ----
+  S.SPRITE_DATA.rattan = [[
+      '...........w....',
+      '..........www...',
+      '...........k....',
+      '....ooo....k....',
+      '...oaaao...k....',
+      '...osssoo..k....',
+      '....ssso...k....',
+      '...orRrRsssk....',
+      '..orRrRro..k....',
+      '..oRrRrRo..k....',
+      '..orRrRro..k....',
+      '...obbbo...k....',
+      '...oR.Ro...k....',
+      '...oo.oo........',
+      '..ooo.ooo.......',
+      '................'
+    ], [
+      '...........w....',
+      '..........www...',
+      '...........k....',
+      '....ooo....k....',
+      '...oaaao...k....',
+      '...osssoo..k....',
+      '....ssso...k....',
+      '...orRrRsssk....',
+      '..orRrRro..k....',
+      '..oRrRrRo..k....',
+      '..orRrRro..k....',
+      '...obbbo...k....',
+      '...oRooRo..k....',
+      '...oo..oo.......',
+      '..oo....oo......',
+      '................'
+    ]];
+  S.SPRITE_DATA.sorcerer = [[
+      '................',
+      '...........y....',
+      '....ooo...yyy...',
+      '...oppppo..y....',
+      '...osssoo..k....',
+      '....ssso...k....',
+      '...oaaaasssk....',
+      '..oaaaaao..k....',
+      '..oapaaao..k....',
+      '..oaaaaao..k....',
+      '..oabaaao..k....',
+      '..oaaaaao..k....',
+      '.oaaaaaaao.k....',
+      '.oabaaabao......',
+      '.ooooooooo......',
+      '................'
+    ], [
+      '................',
+      '..........w.w...',
+      '....ooo...ywy...',
+      '...oppppo.wyw...',
+      '...osssoo..k....',
+      '....ssso...k....',
+      '...oaaaasssk....',
+      '..oaaaaao..k....',
+      '..oapaaao..k....',
+      '..oaaaaao..k....',
+      '..oabaaao..k....',
+      '..oaaaaao..k....',
+      '.oaaaaaaao.k....',
+      '.oabaaabao......',
+      '.ooooooooo......',
+      '................'
+    ]];
+  S.SPRITE_DATA.assassin = [[
+      '................',
+      '................',
+      '....ooo.........',
+      '...onnno........',
+      '...onssoo.......',
+      '....ssso........',
+      '...onnnaaa......',
+      '..onNnnno.w.....',
+      '..onNnnnsww.....',
+      '...onnno........',
+      '...oNNNo........',
+      '..onn.nno.......',
+      '..on...no.......',
+      '.oo.....oo......',
+      '................',
+      '................'
+    ], [
+      '................',
+      '................',
+      '....ooo.........',
+      '...onnno........',
+      '...onssoo.......',
+      '....ssso........',
+      '...onnnaaa......',
+      '..onNnnno.w.....',
+      '..onNnnnsww.....',
+      '...onnno........',
+      '...oNNNo........',
+      '...onnno........',
+      '...on.no........',
+      '...oo.oo........',
+      '................',
+      '................'
+    ]];
+  S.SPRITE_DATA.elephant = [[
+      '................',
+      '......oaao......',
+      '.....oabaao.....',
+      '....oooooooo....',
+      '...oeeeeeeeeo...',
+      '..oeeeeeeeeeeoo.',
+      '.oeeeeeeeeeeeeeo',
+      '.oeeeeeeeeeeoeo.',
+      '.oeeeeeeeeeeeeet',
+      '.oEeeeeeeeeeeeeo',
+      '..oEeeeeeeeeeoeo',
+      '..oeEEEEEEEEo.eo',
+      '..oeeo.oeeo..eo.',
+      '..oeeo.oeeo..o..',
+      '..oooo.oooo.....',
+      '................'
+    ], [
+      '................',
+      '......oaao......',
+      '.....oabaao.....',
+      '....oooooooo....',
+      '...oeeeeeeeeo...',
+      '..oeeeeeeeeeeoo.',
+      '.oeeeeeeeeeeeeeo',
+      '.oeeeeeeeeeeoeo.',
+      '.oeeeeeeeeeeeeet',
+      '.oEeeeeeeeeeeeeo',
+      '..oEeeeeeeeeeoeo',
+      '..oeEEEEEEEEo.eo',
+      '..oeeo..oeeo.eo.',
+      '..oeeo..oeeo.o..',
+      '..oooo..oooo....',
+      '................'
+    ]];
+  S.SPRITE_DATA.tiger = [[
+      '................',
+      '................',
+      '................',
+      '................',
+      '..........ooo...',
+      '.........offfo..',
+      'o........ofefwo.',
+      'fo.ooooooffffwo.',
+      'ofofffdffdffffo.',
+      '.offdffdffdffo..',
+      '..offffffffffo..',
+      '..owffwwffwwfo..',
+      '..of..of.of..of.',
+      '..of..of.of..of.',
+      '..oo..oo.oo..oo.',
+      '................'
+    ], [
+      '................',
+      '................',
+      '................',
+      '................',
+      '..........ooo...',
+      '.........offfo..',
+      'o........ofefwo.',
+      'fo.ooooooffffwo.',
+      'ofofffdffdffffo.',
+      '.offdffdffdffo..',
+      '..offffffffffo..',
+      '..owffwwffwwfo..',
+      '..of...of.of.of.',
+      '..of...of.of.of.',
+      '..oo...oo.oo.oo.',
+      '................'
+    ]];
+  S.SPRITE_DATA.snake = [[
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '..........ooo...',
+      '.........oggeo..',
+      '..ooo....ogggot.',
+      '.ogggo..ogGgo...',
+      'ogGgggooggGo....',
+      'oggoGgggggo.....',
+      '.oo.ooooooo.....',
+      '................'
+    ], [
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '................',
+      '.........ooo....',
+      '........oggeo...',
+      '.ooo....ogggo...',
+      'ogggo..ogGgo....',
+      'gGgggooggGo.....',
+      'ggoGgggggo......',
+      'oo.ooooooo......',
+      '................'
+    ]];
+
   var ANIMAL_PALETTES = {
     wolf: { o: '#202020', f: '#909098', d: '#606068', e: '#f8d838', n: '#202020' },
     boar: { o: '#201008', d: '#6a4020', e: '#f84020', n: '#c08060', t: '#f8f0d0' },
     bear: { o: '#100804', d: '#4a2a14', e: '#f8f0d0', n: '#201008' },
-    deer: { o: '#382010', f: '#c08040', e: '#202020', n: '#382010', t: '#e8d8b0', w: '#ffffff' }
+    deer: { o: '#382010', f: '#c08040', e: '#202020', n: '#382010', t: '#e8d8b0', w: '#ffffff' },
+    tiger: { o: '#201008', f: '#e89030', d: '#2a1a10', e: '#f8e838', w: '#fff4e0' },
+    snake: { o: '#102008', g: '#68b040', G: '#386820', e: '#f84030', t: '#f84060' }
   };
 
 

@@ -13,23 +13,23 @@
   // ---- 職業：三個兵種各三種 (沿用兵種的外觀與相剋)；mul 為能力倍率，pool 為技能池 ----
   S.CLASSES = {
     spear:       { name: S.t('長槍兵'), type: 'spear',   price: 100, mul: {},
-                   pool: ['charge', 'pierce', 'sweep', 'double', 'rally', 'ironwall', 'vigor'] },
+                   pool: ['charge', 'pierce', 'sweep', 'double', 'rally', 'ironwall', 'vigor', 'triple', 'knockStrike'] },
     shield:      { name: S.t('盾兵'),   type: 'spear',   price: 120, mul: { hp: 1.2, atk: 0.75, def: 1.5, spr: 1.2 },
-                   pool: ['sweep', 'ironwall', 'vigor', 'rally', 'heal', 'pierce'] },
+                   pool: ['sweep', 'ironwall', 'vigor', 'rally', 'heal', 'pierce', 'shieldBash', 'guardian'] },
     halberd:     { name: S.t('戟兵'),   type: 'spear',   price: 130, mul: { atk: 1.25, def: 0.85, hp: 1.05 },
-                   pool: ['sweep', 'double', 'charge', 'pierce', 'swift', 'vigor'] },
+                   pool: ['sweep', 'double', 'charge', 'pierce', 'swift', 'vigor', 'triple', 'execute', 'knockStrike'] },
     archer:      { name: S.t('弓手'),   type: 'archer',  price: 120, mul: {},
-                   pool: ['double', 'pierce', 'sharpshoot', 'swift', 'fire', 'thunder'] },
+                   pool: ['double', 'pierce', 'sharpshoot', 'swift', 'fire', 'thunder', 'arrowRain', 'ice'] },
     crossbow:    { name: S.t('弩兵'),   type: 'archer',  price: 140, mul: { atk: 1.35, hp: 0.95 }, attackMul: 1.25,
-                   pool: ['pierce', 'sharpshoot', 'double', 'vigor', 'confuse', 'ironwall'] },
+                   pool: ['pierce', 'sharpshoot', 'double', 'vigor', 'confuse', 'ironwall', 'arrowRain', 'execute'] },
     strategist:  { name: S.t('謀士'),   type: 'archer',  price: 160, mul: { atk: 0.6, int: 1.8, spr: 1.4, mp: 1.6, hp: 0.85 },
-                   pool: ['fire', 'thunder', 'confuse', 'heal', 'rally', 'sharpshoot'] },
+                   pool: ['fire', 'thunder', 'confuse', 'heal', 'rally', 'sharpshoot', 'ice', 'poison', 'drain', 'meteor', 'guardian', 'focus'] },
     cavalry:     { name: S.t('騎兵'),   type: 'cavalry', price: 150, mul: {},
-                   pool: ['charge', 'double', 'swift', 'sweep', 'confuse', 'vigor'] },
+                   pool: ['charge', 'double', 'swift', 'sweep', 'confuse', 'vigor', 'knockStrike', 'execute'] },
     heavycav:    { name: S.t('重騎'),   type: 'cavalry', price: 190, mul: { hp: 1.25, def: 1.35, atk: 1.1 }, moveMul: 1.2,
-                   pool: ['charge', 'sweep', 'ironwall', 'vigor', 'pierce', 'rally'] },
+                   pool: ['charge', 'sweep', 'ironwall', 'vigor', 'pierce', 'rally', 'knockStrike', 'shieldBash'] },
     horsearcher: { name: S.t('弓騎'),   type: 'cavalry', price: 180, mul: { atk: 0.85, hp: 0.9 }, ranged: true, range: 3,
-                   pool: ['double', 'pierce', 'sharpshoot', 'swift', 'charge', 'fire'] }
+                   pool: ['double', 'pierce', 'sharpshoot', 'swift', 'charge', 'fire', 'arrowRain', 'triple'] }
   };
   S.CLASS_KEYS = Object.keys(S.CLASSES);
   S.BASE_CLASS = { spear: 'spear', archer: 'archer', cavalry: 'cavalry' };   // 舊存檔的兵種 → 職業
@@ -96,7 +96,13 @@
     taishici:   { name: '太史慈', cls: 'horsearcher', ilvl: 13, skills: ['double', 'sharpshoot', 'pierce', 'swift'],
                   bonus: { atkPct: 30, crit: 12, hpPct: 15 } },
     fazheng:    { name: '法正',   cls: 'strategist',  ilvl: 16, skills: ['fire', 'thunder', 'confuse', 'heal'],
-                  bonus: { intPct: 40, sprPct: 30, burn: 20 } }
+                  bonus: { intPct: 40, sprPct: 30, burn: 20 } },
+    dianwei:    { name: '典韋',   cls: 'halberd',     ilvl: 9,  skills: ['triple', 'execute', 'sweep', 'vigor'],
+                  bonus: { atkPct: 30, hpPct: 25, crit: 8 } },
+    zhurong:    { name: '祝融',   cls: 'horsearcher', ilvl: 12, skills: ['arrowRain', 'double', 'fire', 'swift'],
+                  bonus: { atkPct: 25, burn: 25, swiftPct: 10 } },
+    pangtong:   { name: '龐統',   cls: 'strategist',  ilvl: 18, skills: ['meteor', 'poison', 'drain', 'focus'],
+                  bonus: { intPct: 45, sprPct: 20, stun: 8 } }
   };
 
   function rnd(a, b) { return a + Math.floor(S.random() * (b - a + 1)); }

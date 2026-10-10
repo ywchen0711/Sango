@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>三國志 霸王之路</title>
   <!-- 檔案網址後面的 ?v= 是版本號：每次更新上線就改成新的日期，瀏覽器才不會混用快取裡的舊檔案 -->
-  <link rel="stylesheet" href="css/style.css?v=20261008f">
+  <link rel="stylesheet" href="css/style.css?v=20261009a">
 </head>
 <body>
   <main>
@@ -41,6 +41,7 @@
         <span class="skillbar">
           <button id="btn-dash" class="tac skill"></button>
           <button id="btn-whirl" class="tac skill"></button>
+          <button id="btn-roar" class="tac skill"></button>
           <span class="stances" title="陣型">
             <button data-stance="free" class="tac">自由<kbd>C</kbd></button><button data-stance="tight" class="tac">方陣<kbd>Z</kbd></button><button data-stance="spread" class="tac">散開<kbd>X</kbd></button>
           </span>
@@ -48,7 +49,7 @@
         <span id="tac-hint" class="tac-hint"></span>
       </div>
       <p class="help"><b>W A S D</b>（或方向鍵）移動主將，<b>滑鼠左鍵點敵人</b>讓主將攻擊該目標；沒有操控時主將會自己找最近的敵人攻擊（按 Q 待命可讓他退回後方）<br>
-        ⚔ 技巧：<b>Shift 突進</b>（往滑鼠方向衝刺、途中無敵、撞暈敵人，可打斷敵將重擊）・<b>F 旋風斬</b>（擊退周圍敵人）・
+        ⚔ 技巧：<b>Shift 突進</b>（往滑鼠方向衝刺、途中無敵、撞暈敵人，可打斷敵將重擊）・<b>F 旋風斬</b>（擊退周圍敵人）・<b>R 霸王怒吼</b>（周圍敵人混亂、友軍攻擊提升）・
         <b>右鍵敵人：全軍集火</b>・陣型 <b>Z 方陣</b>（防禦 +20%、緊跟主將）／<b>X 散開</b>（範圍傷害減半）／<b>C 自由</b><br>
         ⚠ 地上出現<span style="color:#ff6040">紅色範圍</span>是敵人的計策或敵將的蓄力重擊，趕快移開！從敵人<b>背後</b>攻擊傷害 +30%<br>
         🗺 探索模式：走到寶箱上就會打開；靠近敵營會驚醒敵人，擊破敵營掉落裝備並有一隊陣亡士兵歸隊；
@@ -63,31 +64,31 @@
         槍兵 剋 騎兵 · 騎兵 剋 弓兵 · 弓兵 剋 槍兵（物理）｜ 魔法：智力 vs 精神，無視相剋<br>
         空白鍵：暫停 / 繼續　+ / −：調整速度　滑鼠指向單位或表格列可對照<br>
         點地移動：點自己的主將或按 E，再點地面讓主將走過去（右鍵或 Esc 取消）；Q：主將交給電腦出陣 / 退回後方待命<br>
-        計策：消耗軍令（隨時間累積、擊破敵隊 +1），數字鍵 1–4 施放，火計 / 落雷需點選戰場位置（右鍵或 Esc 取消）<br>
+        計策：消耗軍令（隨時間累積、擊破敵隊 +1），數字鍵 1–6 施放（水計緩速一大片敵人、回春補血），火計 / 落雷 / 水計需點選戰場位置（右鍵或 Esc 取消）<br>
         隨機事件：寶箱（點擊可派最近的士兵去撿，可能是陷阱！）、天候變化（大風助火、大雨滅火、濃霧縮短射程）、伏兵；暫停中也可以下令</p>
       <ol id="events" class="events"></ol>
       <div id="roster"></div>
     </div>
   </main>
 
-  <script src="js/i18n.js?v=20261008f"></script>
-  <script src="js/i18n-en.js?v=20261008f"></script>
-  <script src="js/config.js?v=20261008f"></script>
-  <script src="js/items.js?v=20261008f"></script>
-  <script src="js/soldiers.js?v=20261008f"></script>
-  <script src="js/explore.js?v=20261008f"></script>
-  <script src="js/sprites.js?v=20261008f"></script>
-  <script src="js/battle.js?v=20261008f"></script>
-  <script src="js/tactics.js?v=20261008f"></script>
-  <script src="js/elites.js?v=20261008f"></script>
-  <script src="js/skills.js?v=20261008f"></script>
-  <script src="js/render.js?v=20261008f"></script>
-  <script src="js/sound.js?v=20261008f"></script>
-  <script src="js/main.js?v=20261008f"></script>
+  <script src="js/i18n.js?v=20261009a"></script>
+  <script src="js/i18n-en.js?v=20261009a"></script>
+  <script src="js/config.js?v=20261009a"></script>
+  <script src="js/items.js?v=20261009a"></script>
+  <script src="js/soldiers.js?v=20261009a"></script>
+  <script src="js/explore.js?v=20261009a"></script>
+  <script src="js/sprites.js?v=20261009a"></script>
+  <script src="js/battle.js?v=20261009a"></script>
+  <script src="js/tactics.js?v=20261009a"></script>
+  <script src="js/elites.js?v=20261009a"></script>
+  <script src="js/skills.js?v=20261009a"></script>
+  <script src="js/render.js?v=20261009a"></script>
+  <script src="js/sound.js?v=20261009a"></script>
+  <script src="js/main.js?v=20261009a"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
-  <script src="js/supabase-config.js?v=20261008f"></script>
-  <script src="js/account.js?v=20261008f"></script>
-  <script src="js/campaign.js?v=20261008f"></script>
+  <script src="js/supabase-config.js?v=20261009a"></script>
+  <script src="js/account.js?v=20261009a"></script>
+  <script src="js/campaign.js?v=20261009a"></script>
   <script src="/hub.js" data-pos="bottom-left" defer></script>
 </body>
 </html>

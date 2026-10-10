@@ -506,10 +506,89 @@ window.Sango = window.Sango || {};
     "陣型": "Formation"
   };
 
+  // ---- 更多敵人、招式、物品 ----
+  Object.assign(S.EN, {
+    "猛虎": "Tiger",
+    "毒蛇": "Viper",
+    "藤甲兵": "Rattan Troops",
+    "黃巾術士": "Yellow Turban Sorcerer",
+    "刺客": "Assassin",
+    "戰象": "War Elephant",
+    "又快又兇，打倒常常掉落裝備": "Fast and fierce; often drops an item",
+    "咬到會中毒": "Its bite is poisonous",
+    "三段突": "Triple Thrust",
+    "0.6 倍物理傷害 ×3": "0.6× physical damage ×3",
+    "盾擊": "Shield Bash",
+    "1.1 倍物理傷害並使目標混亂 1.2 秒": "1.1× physical damage and confuses the target for 1.2 s",
+    "箭雨": "Arrow Rain",
+    "波及目標周圍 2 格的敵人": "Also hits enemies within 2 tiles of the target",
+    "斬首": "Execute",
+    "1.5 倍物理傷害，無視八成防禦": "1.5× physical damage, ignores 80% of defense",
+    "震退": "Shockwave",
+    "1.3 倍物理傷害並把目標擊退一格": "1.3× physical damage and knocks the target back one tile",
+    "冰封": "Frost",
+    "魔法傷害並使目標緩速 4 秒": "Magic damage and slows the target for 4 s",
+    "毒霧": "Poison Mist",
+    "範圍魔法傷害並中毒 6 秒": "Area magic damage and poison for 6 s",
+    "吸魂": "Soul Drain",
+    "1.4 倍魔法傷害，傷害的一半回復自己": "1.4× magic damage; heals itself for half the damage",
+    "隕石": "Meteor",
+    "大範圍火屬性魔法傷害並混亂 1 秒": "Area fire magic damage and confuses for 1 s",
+    "護盾": "Guardian",
+    "周圍 2 格友軍防禦 +30% 6 秒": "Allies within 2 tiles get +30% defense for 6 s",
+    "凝神": "Focus",
+    "智↑": "INT↑",
+    "周圍 2 格友軍智力 +30% 6 秒": "Allies within 2 tiles get +30% INT for 6 s",
+    "緩速": "Slowed",
+    "中毒": "Poisoned",
+    "水計": "Flood",
+    "指定位置 5×5 範圍魔法傷害並緩速 6 秒，順便澆熄燃燒（依主將智力）": "Magic damage in a 5×5 area, slows for 6 s and puts out fires (scales with INT)",
+    "回春": "Renewal",
+    "全軍回復兵力並解除燃燒（依主將智力）": "Heals the whole army and puts out fires (scales with INT)",
+    "霸王怒吼": "Overlord Roar",
+    "周圍 2 格的敵人混亂 1.3 秒；周圍 3 格的友軍攻擊 +20% 6 秒": "Enemies within 2 tiles are confused for 1.3 s; allies within 3 tiles get +20% attack for 6 s",
+    "仙丹": "Elixir",
+    "開啟的部隊兵力全滿": "The squad that opens it is fully healed",
+    "美酒": "Fine Wine",
+    "開啟的部隊智力 +50% 20 秒": "The squad that opens it gets +50% INT for 20 s",
+    "典韋": "Dian Wei",
+    "祝融": "Zhurong",
+    "龐統": "Pang Tong",
+    "羽扇": "Feather Fan",
+    "雙股劍": "Twin Swords",
+    "斬馬刀": "Horse-Cutter Blade",
+    "道袍": "Taoist Robe",
+    "藤甲": "Rattan Armor",
+    "雉尾冠": "Pheasant Crown",
+    "白馬": "White Horse",
+    "玉虎符": "Jade Tiger Tally",
+    "明珠戒": "Pearl Ring",
+    "金蘭結義戒": "Sworn Brothers Ring",
+    "典韋雙鐵戟": "Dian Wei's Twin Halberds",
+    "寒冰盾": "Frost Shield",
+    "白羽扇": "White Feather Fan",
+    "靈寶護符": "Lingbao Charm",
+    "火龍鎧": "Fire Dragon Armor",
+    "萬勝腰帶": "Belt of Ten Thousand Victories",
+    "爪黃飛電": "Zhuahuang Feidian",
+    "鬼眼盔": "Ghost-Eye Helm",
+    "雷神護手": "Thunder God Gauntlets",
+    "蠻王象牙": "Nanman King's Ivory",
+    "天罡破軍槍": "Tiangang Army-Breaker",
+    "臥龍": "Sleeping Dragon",
+    "常山": "Changshan",
+    "白鶴羽扇": "White Crane Fan",
+    "八卦道袍": "Bagua Robe",
+    "隆中對": "Longzhong Plan",
+    "涯角槍": "Yajiao Spear",
+    "白銀鎧": "Silver Armor",
+    "夜照玉獅子": "Night-Shining Jade Lion"
+  });
+
   // 說明 (index.html 的 .help 整段換掉)
   S.EN_HELP =
     '<b>W A S D</b> (or arrow keys) move the general, <b>left-click an enemy</b> to attack it; when you are not steering, the general attacks the nearest enemy on his own (press Q to make him hold back)<br>' +
-    '⚔ Tricks: <b>Shift Dash</b> (toward the mouse, invulnerable, stuns, interrupts the enemy general\'s slam) · <b>F Whirlwind</b> (knocks back nearby enemies) · ' +
+    '⚔ Tricks: <b>Shift Dash</b> (toward the mouse, invulnerable, stuns, interrupts the enemy general\'s slam) · <b>F Whirlwind</b> (knocks back nearby enemies) · <b>R Overlord Roar</b> (confuses nearby enemies, boosts allies\' attack) · ' +
     '<b>Right-click an enemy: all troops focus it</b> · Formation <b>Z Phalanx</b> (DEF +20%, stays close) / <b>X Spread</b> (area damage halved) / <b>C Free</b><br>' +
     '⚠ A <span style="color:#ff6040">red area</span> on the ground is an enemy tactic or the enemy general\'s slam. Get out! Attacks from <b>behind</b> deal +30%<br>' +
     '🗺 Explore: walk onto chests to open them; getting close wakes enemy camps; destroying a camp drops an item and returns one fallen squad; ' +
@@ -524,6 +603,6 @@ window.Sango = window.Sango || {};
     'Spearmen beat Cavalry · Cavalry beat Archers · Archers beat Spearmen (physical) | Magic: INT vs SPR, ignores matchups<br>' +
     'Space: pause / resume   + / −: speed   Hover units or table rows to highlight them<br>' +
     'Click to move: click your general or press E, then click the ground (right-click or Esc cancels); Q: let the general charge / hold back<br>' +
-    'Tactics cost command (builds over time, +1 per squad destroyed), keys 1–4; Fire Attack / Thunderbolt need a target spot (right-click or Esc cancels)<br>' +
+    'Tactics cost command (builds over time, +1 per squad destroyed), keys 1–6 (Flood slows a crowd, Renewal heals your army); Fire Attack / Thunderbolt / Flood need a target spot (right-click or Esc cancels)<br>' +
     'Random events: chests (click to send the nearest soldier; may be a trap!), weather (gale fans fire, rain puts it out, fog shortens range), ambushes; you can give orders while paused';
 })(window.Sango);

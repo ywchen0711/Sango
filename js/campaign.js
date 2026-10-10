@@ -525,7 +525,7 @@
       '<div class="stage-info">' +
         '<div><b>' + stageLabel(stageIdx) + S.t('</b>　敵將 ') + st.general.name +
           S.t('（') + S.STAT_KEYS.map(function (k) { return S.STAT_NAMES[k] + st.general[k]; }).join(' ') + S.t('）<br>') +
-          S.t('敵軍 ') + S.UNIT_KINDS.map(function (k) {
+          S.t('敵軍 ') + S.UNIT_KINDS.concat(S.ENEMY_KINDS).map(function (k) {
             var n = st.units.filter(function (t) { return t === k; }).length;
             return n ? unitName(k) + '×' + n : '';
           }).filter(Boolean).join(' ') + (levelText(st) ? S.t('　') + levelText(st) : '') + '<br>' +

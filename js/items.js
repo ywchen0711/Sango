@@ -31,6 +31,9 @@
     bawang:  { name: S.t('霸王槍'), slot: 'weapon',   ilvl: 9, war: 10 },
     longdan: { name: S.t('龍膽槍'), slot: 'weapon',   ilvl: 12, war: 13 },
     shenbing:{ name: S.t('神兵戟'), slot: 'weapon',   ilvl: 22, war: 17 },
+    fan:     { name: S.t('羽扇'),   slot: 'weapon',   ilvl: 4, war: 1, int: 5 },
+    twinSword:{ name: S.t('雙股劍'), slot: 'weapon',  ilvl: 10, war: 11, int: 2 },
+    zhanma:  { name: S.t('斬馬刀'), slot: 'weapon',   ilvl: 16, war: 15 },
     cloth:   { name: S.t('布衣'),   slot: 'armor',    ilvl: 1, hp: 3 },
     leather: { name: S.t('皮甲'),   slot: 'armor',    ilvl: 3, hp: 6 },
     chain:   { name: S.t('鎖子甲'), slot: 'armor',    ilvl: 5, hp: 8, lead: 1 },
@@ -38,6 +41,8 @@
     shanwen: { name: S.t('山文甲'), slot: 'armor',    ilvl: 9, hp: 14, lead: 3 },
     yulin:   { name: S.t('魚鱗甲'), slot: 'armor',    ilvl: 12, hp: 18, lead: 4 },
     longlin: { name: S.t('龍鱗鎧'), slot: 'armor',    ilvl: 22, hp: 24, lead: 6 },
+    daopao:  { name: S.t('道袍'),   slot: 'armor',    ilvl: 6, hp: 7, int: 3 },
+    tengArmor:{ name: S.t('藤甲'),  slot: 'armor',    ilvl: 15, hp: 21, lead: 3 },
     // 副手：盾牌或兵書
     woodShield: { name: S.t('木盾'),   slot: 'shield', ilvl: 1,  lead: 1, hp: 2 },
     book:       { name: S.t('兵書'),   slot: 'shield', ilvl: 3,  int: 3, lead: 1 },
@@ -50,6 +55,7 @@
     ironHelm:   { name: S.t('鐵盔'),   slot: 'helm',   ilvl: 8,  hp: 4, lead: 1 },
     lionHelm:   { name: S.t('獅頭盔'), slot: 'helm',   ilvl: 12, hp: 6, lead: 2 },
     phoenixHelm:{ name: S.t('鳳翅盔'), slot: 'helm',   ilvl: 22, hp: 9, lead: 3 },
+    pheasantCap:{ name: S.t('雉尾冠'), slot: 'helm',   ilvl: 16, hp: 6, int: 3 },
     // 護手
     clothGlove: { name: S.t('布手套'), slot: 'gloves', ilvl: 1,  war: 1 },
     leatherGlove:{ name: S.t('皮護手'), slot: 'gloves', ilvl: 5,  war: 2 },
@@ -65,6 +71,7 @@
     leatherBoots:{ name: S.t('皮靴'),  slot: 'boots',  ilvl: 5,  hp: 2, speed: 5 },
     warBoots:   { name: S.t('戰靴'),   slot: 'boots',  ilvl: 10, hp: 3, speed: 8 },
     cloudBoots: { name: S.t('雲履'),   slot: 'boots',  ilvl: 20, hp: 4, speed: 12 },
+    whiteHorse: { name: S.t('白馬'),   slot: 'boots',  ilvl: 14, hp: 3, speed: 15 },
     // 護符
     charm:      { name: S.t('護身符'), slot: 'amulet', ilvl: 1,  int: 2 },
     jade:       { name: S.t('玉珮'),   slot: 'amulet', ilvl: 5,  int: 3, lead: 1 },
@@ -72,11 +79,13 @@
     seal:       { name: S.t('金印'),   slot: 'amulet', ilvl: 9,  int: 4, lead: 3 },
     jade2:      { name: S.t('和氏璧'), slot: 'amulet', ilvl: 12, int: 5, lead: 4 },
     xiseal:     { name: S.t('傳國玉璽'), slot: 'amulet', ilvl: 22, int: 7, lead: 5 },
+    jadeTiger:  { name: S.t('玉虎符'), slot: 'amulet', ilvl: 15, int: 5, lead: 4 },
     // 戒指
     copperRing: { name: S.t('銅戒'),   slot: 'ring',   ilvl: 1,  war: 1 },
     silverRing: { name: S.t('銀戒'),   slot: 'ring',   ilvl: 6,  war: 1, int: 1 },
     goldRing:   { name: S.t('金戒'),   slot: 'ring',   ilvl: 12, war: 2, int: 2 },
-    jadeRing:   { name: S.t('玉戒'),   slot: 'ring',   ilvl: 22, war: 3, int: 3 }
+    jadeRing:   { name: S.t('玉戒'),   slot: 'ring',   ilvl: 22, war: 3, int: 3 },
+    pearlRing:  { name: S.t('明珠戒'), slot: 'ring',   ilvl: 16, war: 2, int: 3, hp: 2 }
   };
 
   // 詞綴數值依部位打折 (小部位的詞綴比較弱，全身 10 件加起來約為原本 3 欄的 1.15 倍)
@@ -148,7 +157,19 @@
     qixing:    { name: S.t('七星寶刀'), slot: 'weapon',   ilvl: 18, war: 18, int: 10, command: 1 },
     jueying:   { name: S.t('絕影'),     slot: 'boots',    ilvl: 20, speed: 50, hp: 14, war: 6 },
     bawangyin: { name: S.t('霸王之印'), slot: 'amulet',   ilvl: 25, troops: 10, war: 8, lead: 8 },
-    tianshen:  { name: S.t('天神護手'), slot: 'gloves',   ilvl: 24, war: 12, hp: 8, troops: 3 }
+    tianshen:  { name: S.t('天神護手'), slot: 'gloves',   ilvl: 24, war: 12, hp: 8, troops: 3 },
+    jinlan:    { name: S.t('金蘭結義戒'), slot: 'ring',   ilvl: 5,  war: 3, int: 3, hp: 4, leech: 4 },
+    shuangtie: { name: S.t('典韋雙鐵戟'), slot: 'weapon', ilvl: 11, war: 16, hp: 6, crit: 8 },
+    hanbing:   { name: S.t('寒冰盾'),   slot: 'shield',   ilvl: 12, lead: 6, hp: 8, slow: 25 },
+    yushan:    { name: S.t('白羽扇'),   slot: 'weapon',   ilvl: 13, int: 18, war: 2, cdr: 10 },
+    lingbao:   { name: S.t('靈寶護符'), slot: 'amulet',   ilvl: 13, int: 8, lead: 3, mf: 30 },
+    huolong:   { name: S.t('火龍鎧'),   slot: 'armor',    ilvl: 14, hp: 24, lead: 6, burn: 20 },
+    wansheng:  { name: S.t('萬勝腰帶'), slot: 'belt',     ilvl: 14, hp: 12, war: 4, gf: 40 },
+    zhuahuang: { name: S.t('爪黃飛電'), slot: 'boots',    ilvl: 17, speed: 40, hp: 10, lead: 4 },
+    guiyan:    { name: S.t('鬼眼盔'),   slot: 'helm',     ilvl: 18, hp: 8, int: 6, crit: 8 },
+    leishen:   { name: S.t('雷神護手'), slot: 'gloves',   ilvl: 19, war: 9, stun: 12 },
+    mengbing:  { name: S.t('蠻王象牙'), slot: 'amulet',   ilvl: 21, troops: 8, hp: 10, pierce: 20 },
+    tiangang:  { name: S.t('天罡破軍槍'), slot: 'weapon', ilvl: 26, war: 24, troops: 4, pierce: 25 }
   };
 
   // ---- 套裝：bonus[n] = 同一套穿滿 n 件時的額外加成 ----
@@ -158,7 +179,11 @@
     guanyu: { name: S.t('武聖'), pieces: ['dragonBlade', 'greenRobe', 'chunqiu'],
               bonus: { 2: { lead: 6 }, 3: { war: 8, troops: 5 } } },
     caocao: { name: S.t('魏武'), pieces: ['weiSword', 'weiRobe', 'mengde'],
-              bonus: { 2: { troops: 6 }, 3: { war: 10, lead: 10, command: 2 } } }
+              bonus: { 2: { troops: 6 }, 3: { war: 10, lead: 10, command: 2 } } },
+    wolong: { name: S.t('臥龍'), pieces: ['wolongFan', 'baguaRobe', 'longzhong'],
+              bonus: { 2: { int: 8 }, 3: { int: 12, command: 2, cdr: 15 } } },
+    zhaoyun:{ name: S.t('常山'), pieces: ['yajiao', 'silverArmor', 'yezhao'],
+              bonus: { 2: { war: 6 }, 3: { war: 8, hp: 12, crit: 10 } } }
   };
   S.SET_ITEMS = {
     halberd:     { name: S.t('方天畫戟'),   slot: 'weapon',   set: 'lubu',   ilvl: 10, war: 18 },
@@ -171,7 +196,13 @@
     chunqiu:     { name: S.t('春秋左傳'),   slot: 'shield',   set: 'guanyu', ilvl: 8,  int: 8, lead: 4 },
     weiSword:    { name: S.t('魏武劍'),     slot: 'weapon',   set: 'caocao', ilvl: 20, war: 16, int: 6 },
     weiRobe:     { name: S.t('魏武袍'),     slot: 'armor',    set: 'caocao', ilvl: 20, hp: 22, lead: 8 },
-    mengde:      { name: S.t('孟德新書'),   slot: 'shield',   set: 'caocao', ilvl: 22, int: 14, command: 2 }
+    mengde:      { name: S.t('孟德新書'),   slot: 'shield',   set: 'caocao', ilvl: 22, int: 14, command: 2 },
+    wolongFan:   { name: S.t('白鶴羽扇'),   slot: 'weapon',   set: 'wolong', ilvl: 14, int: 16, war: 2 },
+    baguaRobe:   { name: S.t('八卦道袍'),   slot: 'armor',    set: 'wolong', ilvl: 14, hp: 14, int: 8 },
+    longzhong:   { name: S.t('隆中對'),     slot: 'shield',   set: 'wolong', ilvl: 15, int: 12, command: 1 },
+    yajiao:      { name: S.t('涯角槍'),     slot: 'weapon',   set: 'zhaoyun', ilvl: 12, war: 17 },
+    silverArmor: { name: S.t('白銀鎧'),     slot: 'armor',    set: 'zhaoyun', ilvl: 12, hp: 18, lead: 5 },
+    yezhao:      { name: S.t('夜照玉獅子'), slot: 'boots',    set: 'zhaoyun', ilvl: 12, war: 4, speed: 35 }
   };
 
   var STATS = ['hp', 'war', 'int', 'lead', 'command', 'troops', 'speed',

@@ -62,7 +62,7 @@
     }
     // 等級加成 (opts.levels[side] = { general: 2, spear: 1, ... }) 與裝備的全軍士兵加成 (army.troopBonus)
     var lv = battle.levels && battle.levels[side];
-    this.level = (lv && lv[type]) || 0;
+    this.level = (lv && (lv[type] != null ? lv[type] : lv[S.baseType(type)])) || 0;   // 特殊兵種比照基本兵種的等級
     var named = preset && preset.name != null;   // 士兵角色 (soldiers.js)：能力已含等級，名字、技能等級、特效都由 preset 帶入
     var bonus = (named ? 0 : this.level * S.LEVEL.BONUS) + (this.isGeneral ? 0 : army.troopBonus || 0);   // 士兵角色的等級已算在 preset 裡
     if (bonus) {
@@ -78,11 +78,12 @@
       this.skillLv = preset.skillLv || null;
       this.procs = preset.procs || null;
     }
+    if (!this.procs && st.procs) this.procs = st.procs;   // 兵種天生的特效 (刺客的致命一擊)
     this.hp = this.maxHp;
     this.mp = this.maxMp;
     var nSkills = this.isGeneral ? S.GENERAL_SKILLS : 2;   // 一般士兵物理 / 魔法各兩個 (和士兵角色的四個技能對等)
-    this.physSkills = preset ? preset.physSkills.slice() : S.pickDistinct(S.PHYSICAL_SKILLS, nSkills, rng);
-    this.magicSkills = preset ? preset.magicSkills.slice() : S.pickDistinct(S.MAGIC_SKILLS, nSkills, rng);
+    this.physSkills = preset ? preset.physSkills.slice() : S.pickDistinct(st.skills ? st.skills.phys : S.PHYSICAL_SKILLS, nSkills, rng);
+    this.magicSkills = preset ? preset.magicSkills.slice() : S.pickDistinct(st.skills ? st.skills.magic : S.MAGIC_SKILLS, nSkills, rng);
     this.buffs = [];   // { kind: 'stat'|'burn'|'stun', t: 剩餘秒數, ... }
     this.range = named && preset.range ? preset.range : st.range;
     this.ranged = named && preset.ranged != null ? preset.ranged : !!st.ranged;
@@ -446,7 +447,7 @@
       this.sound('shrine', e);
       return;
     }
-    var chance = { bear: 0.5, boar: 0.15, wolf: 0.1 }[e.animal] || 0;
+    var chance = { bear: 0.5, tiger: 0.45, boar: 0.15, snake: 0.12, wolf: 0.1 }[e.animal] || 0;
     if (this.rng() >= chance) return;
     var item = S.rollLoot(this.explore.ilvl, this.mf), info = S.itemInfo(item);
     this.lootFound.push(item);
@@ -505,7 +506,7 @@
     var army = this.armies[side];
     var self = this;
     function place(type, preset) {
-      var slots = S.FORMATION[type] || [];
+      var slots = S.FORMATION[type] || S.FORMATION[S.baseType(type)] || [];
       for (var i = 0; i < slots.length; i++) {
         var x = side === 0 ? slots[i][0] : self.cols - 1 - slots[i][0];
         var y = slots[i][1];
@@ -925,12 +926,14 @@
     if (e.dead) return;
     var sk = hit.skill || {};
     var power = (sk.power || 1) * hit.mul * (sk.element === 'fire' ? this.fireMul() : 1);
-    var targets = [e];
-    if (sk.area) {
+    var targets = [e], ut = S.UNIT_TYPES[u.type] || {};
+    var area = sk.area || (!hit.magic && ut.trample) || 0;          // 戰象的普通攻擊也會踩到周圍
+    if (area) {
       this.alive(e.side).forEach(function (o) {
-        if (o !== e && cheb(o.x, o.y, e.x, e.y) <= sk.area) targets.push(o);
+        if (o !== e && cheb(o.x, o.y, e.x, e.y) <= area) targets.push(o);
       });
     }
+    var drained = 0;
     // 主將的中綴特效 (裝備)：破甲、致命一擊、吸血、燃燒 / 混亂 / 緩速
     var procs = u.procs || (u.isGeneral && this.armies[u.side] && this.armies[u.side].procs);   // 士兵也可以有特效
     for (var i = 0; i < targets.length; i++) {
@@ -938,13 +941,15 @@
       for (var h = 0; h < (sk.hits || 1) && !t.dead; h++) {
         var ignore = Math.min(0.9, (sk.ignoreDef || 0) + (procs && !hit.magic ? procs.pierce / 100 : 0));
         var dmg = this.calcDamage(u, t, hit.magic, power, ignore);
-        if (t !== e) dmg = Math.max(1, Math.round(dmg * this.aoeMul(t)));   // 範圍波及 (散開陣型減半)
+        if (t !== e) dmg = Math.max(1, Math.round(dmg * this.aoeMul(t) * (sk.area ? 1 : 0.5)));   // 範圍波及 (散開陣型減半；戰象踩踏只有一半)
         if (hit.ranged) dmg = Math.max(1, Math.round(dmg * (this.terrainAt(t.x, t.y).rangedDef || 1)));   // 森林擋箭
+        if (sk.element === 'fire' && S.UNIT_TYPES[t.type].fireWeak) dmg = Math.round(dmg * S.UNIT_TYPES[t.type].fireWeak);   // 藤甲怕火
         if (procs && procs.crit && this.rng() < procs.crit / 100) {
           dmg *= 2;
           this.addText(t, S.t('致命!'), '#ff4060', 0.9, -0.9);
         }
         this.applyDamage(t, dmg, hit.magic ? '#e0b0ff' : null);
+        drained += dmg;
         if (u.elite) this.eliteOnHit(u, dmg);
         if (procs && procs.leech && !u.dead) u.hp = Math.min(u.maxHp, u.hp + dmg * procs.leech / 100);
       }
@@ -959,8 +964,19 @@
         this.addBuff(t, { kind: 'stun', t: sk.stun });
         this.addText(t, S.t('混亂'), '#e070ff', 0.9, -0.4);
       }
+      if (sk.slow) { this.addBuff(t, { kind: 'slow', t: sk.slow }); this.addText(t, S.t('緩速'), '#a0e8ff', 0.9, -0.4); }
+      if (sk.knock) this.knockback(t, t.x - u.x, t.y - u.y);
+      if (ut.venom && !hit.magic && !t.findBuff('burn')) {        // 毒蛇咬到會中毒
+        this.addBuff(t, { kind: 'burn', dps: Math.max(1, Math.round(u.atk * ut.venom.ratio)), t: ut.venom.dur, tick: 1 });
+        this.addText(t, S.t('中毒'), '#90e040', 0.9, -0.4);
+      }
       if (hit.skill) this.addBurst(t, sk.color || '#ffffff', sk.fx);
       else if (hit.magic) this.addBurst(t, MAGIC_COLOR);
+    }
+    if (sk.drain && drained && !u.dead) {                       // 吸魂：傷害的一部分回復自己
+      var back = Math.round(drained * sk.drain);
+      u.hp = Math.min(u.maxHp, u.hp + back);
+      this.addText(u, '+' + back, '#c080ff', 0.9);
     }
   };
 
@@ -1138,7 +1154,7 @@
     this.units.forEach(function (u) {
       if (u.side !== side || u.dead || S.UNIT_TYPES[u.type].beast) return;
       if (u.isGeneral) s.hp = u.hp;
-      else s[u.type] += u.hp;
+      else s[S.baseType(u.type)] += u.hp;   // 特殊兵種算進基本兵種 (戰象、刺客 → 騎；術士 → 弓；藤甲 → 步)
     });
     Object.keys(s).forEach(function (k) { s[k] = Math.ceil(s[k]); });   // 探索模式的回復會產生小數
     return s;

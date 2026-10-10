@@ -66,8 +66,29 @@ window.Sango = window.Sango || {};
     wolf: { name: S.t('野狼'), hp: 115, mp: 0, atk: 10, def: 6, int: 0, spr: 4, range: 1, moveTime: 0.32, attackTime: 0.9, beast: true },
     boar: { name: S.t('野豬'), hp: 190, mp: 0, atk: 13, def: 9, int: 0, spr: 4, range: 1, moveTime: 0.36, attackTime: 1.2, beast: true },
     bear: { name: S.t('熊'), hp: 420, mp: 0, atk: 18, def: 12, int: 0, spr: 8, range: 1, moveTime: 0.55, attackTime: 1.5, beast: true },
-    deer: { name: S.t('鹿'), hp: 90, mp: 0, atk: 1, def: 4, int: 0, spr: 3, range: 1, moveTime: 0.28, attackTime: 2.0, beast: true }
+    deer: { name: S.t('鹿'), hp: 90, mp: 0, atk: 1, def: 4, int: 0, spr: 3, range: 1, moveTime: 0.28, attackTime: 2.0, beast: true },
+    tiger: { name: S.t('猛虎'), hp: 300, mp: 0, atk: 21, def: 10, int: 0, spr: 6, range: 1, moveTime: 0.30, attackTime: 1.0, beast: true },
+    snake: { name: S.t('毒蛇'), hp: 110, mp: 0, atk: 12, def: 5, int: 0, spr: 4, range: 1, moveTime: 0.45, attackTime: 1.2, beast: true,
+             venom: { ratio: 0.45, dur: 5 } },                // 咬到會中毒 (每秒損失 攻擊 × ratio)
+
+    // ---- 敵軍特殊兵種 (只出現在敵方)：base = 相剋、布陣、等級都比照哪個基本兵種 ----
+    // skills：固定的特技池 (phys / magic)；procs：天生的特效；fireWeak：受到火攻的傷害倍率；trample：普通攻擊波及周圍幾格
+    rattan:   { name: S.t('藤甲兵'), base: 'spear', hp: 210, mp: 30, atk: 12, def: 16, int: 3, spr: 5,
+                range: 1, moveTime: 0.55, attackTime: 1.1, fireWeak: 2,
+                skills: { phys: ['shieldBash', 'sweep', 'pierce'], magic: ['guardian'] } },
+    sorcerer: { name: S.t('黃巾術士'), base: 'archer', hp: 140, mp: 80, atk: 5, def: 5, int: 12, spr: 11,
+                range: 3, moveTime: 0.55, attackTime: 1.5, ranged: true, meleePenalty: 0.5,
+                skills: { phys: [], magic: ['fire', 'thunder', 'confuse', 'poison', 'ice', 'drain'] } },
+    assassin: { name: S.t('刺客'), base: 'cavalry', hp: 145, mp: 30, atk: 15, def: 6, int: 4, spr: 6,
+                range: 1, moveTime: 0.30, attackTime: 0.85, procs: { crit: 20 },
+                skills: { phys: ['double', 'triple', 'execute', 'pierce'], magic: [] } },
+    elephant: { name: S.t('戰象'), base: 'cavalry', hp: 280, mp: 20, atk: 14, def: 11, int: 2, spr: 6,
+                range: 1, moveTime: 0.62, attackTime: 1.8, trample: 1,
+                skills: { phys: ['sweep', 'knockStrike', 'charge'], magic: [] } }
   };
+  S.ENEMY_KINDS = ['rattan', 'sorcerer', 'assassin', 'elephant'];
+  // 兵種的「基本兵種」：相剋、布陣、等級加成都用它 (槍兵 / 弓兵 / 騎兵本身就是基本兵種)
+  S.baseType = function (t) { var d = S.UNIT_TYPES[t]; return (d && d.base) || t; };
   S.STAT_VARIANCE = 0.15;
 
   // 主將數值 = 兵種基礎值 + 武將能力 × 係數
@@ -126,10 +147,27 @@ window.Sango = window.Sango || {};
     heal:    { name: S.t('治療'), kind: 'magic', mp: 14, heal: 4, support: true, color: '#60ff90',
                desc: S.t('回復附近兵力最低的友軍 (智力 ×4)') },
     rally:   { name: S.t('鼓舞'), kind: 'magic', mp: 15, support: true, radius: 2, color: '#ff9040',
-               buff: { stat: 'atk', mul: 1.25, dur: 6, label: S.t('攻↑') }, desc: S.t('周圍 2 格友軍攻擊 +25% 6 秒') }
+               buff: { stat: 'atk', mul: 1.25, dur: 6, label: S.t('攻↑') }, desc: S.t('周圍 2 格友軍攻擊 +25% 6 秒') },
+    // ---- 更多特技 ----
+    // slow: 緩速秒數 (移動與攻擊變慢)  drain: 傷害的多少比例回復自己  knock: 擊退一格
+    triple:      { name: S.t('三段突'), kind: 'physical', mp: 16, power: 0.6, hits: 3, desc: S.t('0.6 倍物理傷害 ×3') },
+    shieldBash:  { name: S.t('盾擊'),   kind: 'physical', mp: 14, power: 1.1, stun: 1.2, desc: S.t('1.1 倍物理傷害並使目標混亂 1.2 秒') },
+    arrowRain:   { name: S.t('箭雨'),   kind: 'physical', mp: 20, power: 0.75, area: 2, color: '#e0d080', desc: S.t('波及目標周圍 2 格的敵人') },
+    execute:     { name: S.t('斬首'),   kind: 'physical', mp: 18, power: 1.5, ignoreDef: 0.8, desc: S.t('1.5 倍物理傷害，無視八成防禦') },
+    knockStrike: { name: S.t('震退'),   kind: 'physical', mp: 12, power: 1.3, knock: true, desc: S.t('1.3 倍物理傷害並把目標擊退一格') },
+    ice:         { name: S.t('冰封'),   kind: 'magic', mp: 16, power: 1.3, slow: 4, color: '#a0e8ff', desc: S.t('魔法傷害並使目標緩速 4 秒') },
+    poison:      { name: S.t('毒霧'),   kind: 'magic', mp: 18, power: 0.6, area: 1, burn: { ratio: 0.8, dur: 6 }, color: '#90e040',
+                   desc: S.t('範圍魔法傷害並中毒 6 秒') },
+    drain:       { name: S.t('吸魂'),   kind: 'magic', mp: 18, power: 1.4, drain: 0.5, color: '#c060ff', desc: S.t('1.4 倍魔法傷害，傷害的一半回復自己') },
+    meteor:      { name: S.t('隕石'),   kind: 'magic', mp: 28, power: 1.7, area: 1, stun: 1, element: 'fire', color: '#ff9040', fx: 'bolt',
+                   desc: S.t('大範圍火屬性魔法傷害並混亂 1 秒') },
+    guardian:    { name: S.t('護盾'),   kind: 'magic', mp: 15, support: true, radius: 2, color: '#60a0ff',
+                   buff: { stat: 'def', mul: 1.3, dur: 6, label: S.t('防↑') }, desc: S.t('周圍 2 格友軍防禦 +30% 6 秒') },
+    focus:       { name: S.t('凝神'),   kind: 'magic', mp: 15, support: true, radius: 2, color: '#c0a0ff',
+                   buff: { stat: 'int', mul: 1.3, dur: 6, label: S.t('智↑') }, desc: S.t('周圍 2 格友軍智力 +30% 6 秒') }
   };
-  S.PHYSICAL_SKILLS = ['charge', 'double', 'pierce', 'sweep'];
-  S.MAGIC_SKILLS = ['fire', 'thunder', 'confuse', 'heal', 'rally'];
+  S.PHYSICAL_SKILLS = ['charge', 'double', 'pierce', 'sweep', 'triple', 'shieldBash', 'arrowRain', 'execute', 'knockStrike'];
+  S.MAGIC_SKILLS = ['fire', 'thunder', 'confuse', 'heal', 'rally', 'ice', 'poison', 'drain', 'meteor', 'guardian', 'focus'];
 
   // ---- 主將計策 (玩家可決定施放時機；電腦方由 AI 判斷) ----
   // 軍令：隨時間累積、擊破敵隊額外獲得；主將陣亡後無法再下令
@@ -152,9 +190,13 @@ window.Sango = window.Sango || {};
                desc: S.t('全軍攻擊提升 8 秒（依主將武力）') },
     guard:   { name: S.t('堅守'), key: '4', cost: 3, cd: 16, color: '#60a0ff',
                buff: { stat: 'def', mul: 1.15, from: 'lead', scale: 500, dur: 8, label: S.t('防↑') },
-               desc: S.t('全軍防禦提升 8 秒（依主將統率）') }
+               desc: S.t('全軍防禦提升 8 秒（依主將統率）') },
+    flood:   { name: S.t('水計'), key: '5', cost: 5, cd: 18, target: true, radius: 2, power: 1.0, slow: 6, color: '#40a0ff',
+               desc: S.t('指定位置 5×5 範圍魔法傷害並緩速 6 秒，順便澆熄燃燒（依主將智力）') },
+    cure:    { name: S.t('回春'), key: '6', cost: 6, cd: 30, color: '#60ff90', healAll: { base: 0.08, from: 'int', scale: 1500 },
+               desc: S.t('全軍回復兵力並解除燃燒（依主將智力）') }
   };
-  S.TACTIC_IDS = ['fire', 'thunder', 'rally', 'guard'];
+  S.TACTIC_IDS = ['fire', 'thunder', 'rally', 'guard', 'flood', 'cure'];
   // 計策的魔法傷害以「計策智力 = base + 武將智力 × ratio」計算 (比主將本身的智力起伏小，避免智將一面倒)
   S.TACTIC_INT = { base: 9, ratio: 1 / 20 };
 
@@ -176,7 +218,10 @@ window.Sango = window.Sango || {};
               desc: S.t('開啟的部隊攻擊 +40% 20 秒') },
     armor:  { name: S.t('鎧甲'), weight: 2, buff: { stat: 'def', mul: 1.5, dur: 20, label: S.t('防↑') }, color: '#60a0ff',
               desc: S.t('開啟的部隊防禦 +50% 20 秒') },
-    trap:   { name: S.t('陷阱'), weight: 2, damage: 0.3, stun: 2, color: '#ff4040', desc: S.t('爆炸！損失 30% 兵力並混亂 2 秒') }
+    trap:   { name: S.t('陷阱'), weight: 2, damage: 0.3, stun: 2, color: '#ff4040', desc: S.t('爆炸！損失 30% 兵力並混亂 2 秒') },
+    elixir: { name: S.t('仙丹'), weight: 1, heal: 1.0, color: '#ffe080', desc: S.t('開啟的部隊兵力全滿') },
+    wine:   { name: S.t('美酒'), weight: 2, buff: { stat: 'int', mul: 1.5, dur: 20, label: S.t('智↑') }, color: '#c0a0ff',
+              desc: S.t('開啟的部隊智力 +50% 20 秒') }
   };
 
   // 天候：每隔一段時間可能變化，影響火攻與射程
@@ -197,6 +242,7 @@ window.Sango = window.Sango || {};
   S.COUNTER_MALUS = 0.7;
 
   S.matchup = function (atkType, defType) {
+    atkType = S.baseType(atkType); defType = S.baseType(defType);
     if (S.COUNTER[atkType] === defType) return S.COUNTER_BONUS;
     if (S.COUNTER[defType] === atkType) return S.COUNTER_MALUS;
     return 1;
@@ -285,23 +331,23 @@ window.Sango = window.Sango || {};
     { title: S.t('黃巾之亂'), general: { name: S.t('程遠志'), hp: 45, war: 52, int: 20, lead: 30, beard: '#403020' },
       units: ['spear', 'spear', 'archer', 'archer'], lv: 0, gold: 120, exp: 100 },
     { title: S.t('廣宗之戰'), general: { name: S.t('張寶'), hp: 55, war: 45, int: 72, lead: 45, beard: '#202020' },
-      units: ['spear', 'spear', 'archer', 'archer', 'cavalry'], lv: 0, gold: 140, exp: 150 },
+      units: ['spear', 'spear', 'archer', 'sorcerer', 'cavalry'], lv: 0, gold: 140, exp: 150 },
     { title: S.t('汜水關'), general: { name: S.t('華雄'), hp: 80, war: 86, int: 35, lead: 60, beard: '#282018' },
-      units: ['spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 1 }, gold: 160, exp: 200, drops: [{ quality: 'rare' }] },
+      units: ['spear', 'spear', 'archer', 'archer', 'cavalry', 'assassin'], lv: { general: 1 }, gold: 160, exp: 200, drops: [{ quality: 'rare' }] },
     { title: S.t('壽春討伐'), general: { name: S.t('紀靈'), hp: 75, war: 82, int: 42, lead: 70, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 180, exp: 250 },
+      units: ['spear', 'spear', 'rattan', 'archer', 'archer', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1, archer: 1, cavalry: 1 }, gold: 180, exp: 250 },
     { title: S.t('白馬之圍'), general: { name: S.t('顏良'), hp: 85, war: 92, int: 35, lead: 66, beard: '#302010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 2, spear: 1 }, gold: 200, exp: 300, drops: [{ unique: 'dilu' }] },
+      units: ['spear', 'spear', 'rattan', 'archer', 'archer', 'sorcerer', 'cavalry', 'cavalry', 'elephant'], lv: { general: 2, spear: 1 }, gold: 200, exp: 300, drops: [{ unique: 'dilu' }] },
     { title: S.t('延津之戰'), general: { name: S.t('文醜'), hp: 85, war: 90, int: 30, lead: 70, beard: '#201810' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 3, spear: 2, archer: 1, cavalry: 2 }, gold: 220, exp: 350, drops: [{ unique: 'warDrum' }] },
+      units: ['spear', 'spear', 'rattan', 'archer', 'archer', 'assassin', 'cavalry', 'cavalry', 'elephant'], lv: { general: 3, spear: 2, archer: 1, cavalry: 2 }, gold: 220, exp: 350, drops: [{ unique: 'warDrum' }] },
     { title: S.t('合肥之戰'), general: { name: S.t('張遼'), hp: 85, war: 92, int: 78, lead: 92, beard: '#202020' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 3 }, gold: 240, exp: 400 },
+      units: ['spear', 'rattan', 'rattan', 'archer', 'archer', 'sorcerer', 'cavalry', 'assassin', 'assassin'], lv: { general: 4, spear: 3, archer: 3, cavalry: 3 }, gold: 240, exp: 400 },
     { title: S.t('博望坡'), general: { name: S.t('夏侯惇'), hp: 90, war: 90, int: 58, lead: 86, beard: '#181818' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 4, spear: 3, archer: 3, cavalry: 4 }, gold: 260, exp: 450, drops: [{ unique: 'qinggang' }] },
+      units: ['spear', 'spear', 'rattan', 'archer', 'sorcerer', 'sorcerer', 'cavalry', 'cavalry', 'elephant'], lv: { general: 4, spear: 3, archer: 3, cavalry: 4 }, gold: 260, exp: 450, drops: [{ unique: 'qinggang' }] },
     { title: S.t('樊城之戰'), general: { name: S.t('關羽'), hp: 95, war: 97, int: 75, lead: 95, beard: '#101010' },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 5, spear: 4, archer: 4, cavalry: 4 }, gold: 300, exp: 500, drops: [{ set: 'dragonBlade' }] },
+      units: ['spear', 'spear', 'rattan', 'archer', 'archer', 'sorcerer', 'cavalry', 'assassin', 'elephant'], lv: { general: 5, spear: 4, archer: 4, cavalry: 4 }, gold: 300, exp: 500, drops: [{ set: 'dragonBlade' }] },
     { title: S.t('虎牢關'), general: { name: S.t('呂布'), hp: 98, war: 100, int: 26, lead: 85, beard: null },
-      units: ['spear', 'spear', 'spear', 'archer', 'archer', 'archer', 'cavalry', 'cavalry', 'cavalry'], lv: { general: 6, spear: 6, archer: 5, cavalry: 6 }, gold: 500, exp: 600, drops: [{ set: 'halberd' }, { set: 'redHare' }] }
+      units: ['spear', 'spear', 'rattan', 'archer', 'archer', 'sorcerer', 'assassin', 'cavalry', 'elephant'], lv: { general: 6, spear: 6, archer: 5, cavalry: 6 }, gold: 500, exp: 600, drops: [{ set: 'halberd' }, { set: 'redHare' }] }
   ];
 
   // ---- 雙方軍隊 (hp=體力 war=武力 int=智力 lead=統率；統率提升士兵防禦) ----

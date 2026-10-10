@@ -15,7 +15,9 @@
     dash:  { name: S.t('突進'),   key: 'Shift', cd: 6, range: 4, power: 1.6, stun: 1.0, invuln: 0.45,
              desc: S.t('往滑鼠方向衝刺最多 4 格，途中無敵；撞到的第一個敵人受 1.6 倍傷害、被擊退並混亂 1 秒（可打斷敵將重擊）') },
     whirl: { name: S.t('旋風斬'), key: 'F', cd: 8, power: 1.3,
-             desc: S.t('對周圍一圈的敵人造成 1.3 倍傷害並全部擊退一格') }
+             desc: S.t('對周圍一圈的敵人造成 1.3 倍傷害並全部擊退一格') },
+    roar:  { name: S.t('霸王怒吼'), key: 'R', cd: 15, radius: 2, stun: 1.3, buffRadius: 3, buff: 1.2, dur: 6,
+             desc: S.t('周圍 2 格的敵人混亂 1.3 秒；周圍 3 格的友軍攻擊 +20% 6 秒') }
   };
   S.TELEGRAPH = 1.2;              // 敵方計策的預警時間 (秒)
   S.SLAM = { cd: [7, 10], windup: 1.0, trigger: 2, radius: 1, power: 2.2, stun: 1.0 };   // 敵將重擊
@@ -46,14 +48,14 @@
       var f = this.focus[side];
       if (f && (f.dead || (this.focusT[side] -= dt) <= 0)) this.focus[side] = null;
       var g = this.generals[side];
-      if (g && g.skillCd) { g.skillCd.dash -= dt; g.skillCd.whirl -= dt; }
+      if (g && g.skillCd) { g.skillCd.dash -= dt; g.skillCd.whirl -= dt; g.skillCd.roar -= dt; }
       if (g && g.invulnT > 0) g.invulnT -= dt;
     }
     this.units.forEach(function (u) { if (u.windup && (u.dead || u.findBuff('stun'))) self.cancelSlam(u); });
   };
 
   // ======================= 主將技能 =======================
-  function cds(g) { if (!g.skillCd) g.skillCd = { dash: 0, whirl: 0 }; return g.skillCd; }
+  function cds(g) { if (!g.skillCd) g.skillCd = { dash: 0, whirl: 0, roar: 0 }; return g.skillCd; }
   B.skillCooldown = function (side, id) {
     var g = this.generals[side];
     return g ? Math.max(0, cds(g)[id]) : 0;
@@ -131,6 +133,28 @@
     this.effects.push({ fx: 'ring', x: g.posX(), y: g.posY(), color: '#fff080', t: 0, dur: 0.4 });
     this.addText(g, def.name + '!', '#fff080', 0.9, -0.6);
     this.sound('skillPhys', g);
+    return '';
+  };
+
+  // 霸王怒吼：周圍敵人混亂，周圍友軍攻擊提升
+  B.generalRoar = function (side) {
+    var why = this.skillBlocked(side, 'roar');
+    if (why) return why;
+    var g = this.generals[side], def = S.GENERAL_SKILLS_DEF.roar, self = this;
+    cds(g).roar = def.cd * this.cdMul(side);
+    this.alive(1 - side).forEach(function (e) {
+      if (cheb(e.x, e.y, g.x, g.y) > def.radius) return;
+      self.addBuff(e, { kind: 'stun', t: def.stun });
+      self.addText(e, S.t('混亂'), '#e070ff', 0.9, -0.4);
+    });
+    this.alive(side).forEach(function (a) {
+      if (cheb(a.x, a.y, g.x, g.y) > def.buffRadius) return;
+      self.addBuff(a, { kind: 'stat', stat: 'atk', mul: def.buff, t: def.dur });
+      self.addBurst(a, '#ff9040');
+    });
+    this.effects.push({ fx: 'ring', x: g.posX(), y: g.posY(), color: '#ff9040', t: 0, dur: 0.6 });
+    this.addText(g, def.name + '!', '#ff9040', 1.1, -0.6);
+    this.sound('rally', g);
     return '';
   };
 

@@ -48,7 +48,9 @@
     wolf: { name: S.t('野狼'), aggro: 8, pack: [2, 3], desc: S.t('成群出沒，主動攻擊') },
     boar: { name: S.t('野豬'), aggro: 3, pack: [1, 2], desc: S.t('靠近或被攻擊才會衝撞') },
     bear: { name: S.t('熊'),   aggro: 5, pack: [1, 1], desc: S.t('強悍，打倒可能掉落裝備') },
-    deer: { name: S.t('鹿'),   aggro: 6, pack: [2, 3], passive: true, desc: S.t('會逃跑，獵到可讓全軍回復兵力') }
+    deer: { name: S.t('鹿'),   aggro: 6, pack: [2, 3], passive: true, desc: S.t('會逃跑，獵到可讓全軍回復兵力') },
+    tiger: { name: S.t('猛虎'), aggro: 6, pack: [1, 1], desc: S.t('又快又兇，打倒常常掉落裝備') },
+    snake: { name: S.t('毒蛇'), aggro: 3, pack: [1, 2], desc: S.t('咬到會中毒') }
   };
   // 動物的能力 (preset)：隨關卡 / 難度的等級成長
   S.animalPreset = function (kind, lv) {
@@ -271,14 +273,15 @@
 
     // 動物群
     var animalAvoid = [{ x: start.x, y: start.y, gap: 14 }, { x: boss.x, y: boss.y, gap: 12 }];
-    [['wolf', 2], ['boar', 3], ['bear', (stageIdx >= 1 ? 1 : 0) + (stageIdx >= 4 ? 1 : 0)], ['deer', 2]].forEach(function (a) {
+    [['wolf', 2], ['boar', 3], ['bear', (stageIdx >= 1 ? 1 : 0) + (stageIdx >= 4 ? 1 : 0)], ['deer', 2],
+     ['snake', 2], ['tiger', (stageIdx >= 3 ? 1 : 0) + (stageIdx >= 7 ? 1 : 0)]].forEach(function (a) {
       for (var j = 0; j < a[1]; j++) {
         var p = P.spot(rng, animalAvoid);
         if (!p) return;
         animalAvoid.push({ x: p.x, y: p.y, gap: 10 });
         var id = campSeq++, def = S.ANIMALS[a[0]];
         P.around(p.x, p.y, ri(def.pack[0], def.pack[1])).forEach(function (cell) {
-          spawns.push({ type: a[0], animal: a[0], lv: lvBase + (a[0] === 'bear' ? 2 : 0), x: cell.x, y: cell.y, camp: id, area: 0 });
+          spawns.push({ type: a[0], animal: a[0], lv: lvBase + (a[0] === 'bear' || a[0] === 'tiger' ? 2 : 0), x: cell.x, y: cell.y, camp: id, area: 0 });
         });
       }
     });

@@ -13,6 +13,7 @@
   var btnSound = document.getElementById('btn-sound');
   var btnDash = document.getElementById('btn-dash');
   var btnWhirl = document.getElementById('btn-whirl');
+  var btnRoar = document.getElementById('btn-roar');
   var stanceBtns = document.querySelectorAll('[data-stance]');
   var stanceKey = 'free';         // 我軍陣型 (下一場戰鬥沿用)
   var mouseWorld = null;          // 滑鼠所在的地圖座標 (格)，突進方向用
@@ -103,6 +104,12 @@
     if (why) hint(S.GENERAL_SKILLS_DEF.whirl.name + S.t('：') + why);
     updateTactics();
   }
+  function doRoar() {
+    if (!canCommand()) return;
+    var why = battle.generalRoar(humanSide);
+    if (why) hint(S.GENERAL_SKILLS_DEF.roar.name + S.t('：') + why);
+    updateTactics();
+  }
   function setStanceKey(k, user) {
     stanceKey = k;
     if (battle) battle.setStance(humanSide, k);
@@ -111,6 +118,8 @@
   }
   btnDash.addEventListener('click', doDash);
   btnWhirl.addEventListener('click', doWhirl);
+  btnRoar.addEventListener('click', doRoar);
+  btnRoar.title = S.GENERAL_SKILLS_DEF.roar.desc;
   btnDash.title = S.GENERAL_SKILLS_DEF.dash.desc;
   btnWhirl.title = S.GENERAL_SKILLS_DEF.whirl.desc;
   Array.prototype.forEach.call(stanceBtns, function (b) {
@@ -197,7 +206,7 @@
     btnGeneral.disabled = !alive || !canCommand();
     if (commanding && (!alive || !canCommand())) setCommanding(false);
     btnCommand.disabled = !alive || !canCommand();
-    [['dash', btnDash], ['whirl', btnWhirl]].forEach(function (p) {
+    [['dash', btnDash], ['whirl', btnWhirl], ['roar', btnRoar]].forEach(function (p) {
       var def = S.GENERAL_SKILLS_DEF[p[0]], cd = battle.skillCooldown(side, p[0]);
       p[1].innerHTML = def.name + (cd > 0 ? '<small>' + Math.ceil(cd) + 's</small>' : '') + '<kbd>' + def.key + '</kbd>';
       p[1].disabled = !canCommand() || !!battle.skillBlocked(side, p[0]);
@@ -238,12 +247,13 @@
     roster.innerHTML = [0, 1].map(function (side) {
       var army = armies[side];
       var count = { spear: 0, archer: 0, cavalry: 0 };
-      army.units.forEach(function (t) { count[t.type || t]++; });
-      var summary = S.UNIT_KINDS.map(function (k) { return SHORT[k] + '×' + count[k]; }).join(' ');
-      var numbers = { spear: 0, archer: 0, cavalry: 0 };
+      army.units.forEach(function (t) { var k = t.type || t; count[k] = (count[k] || 0) + 1; });
+      var summary = S.UNIT_KINDS.concat(S.ENEMY_KINDS).filter(function (k) { return count[k]; })
+        .map(function (k) { return (SHORT[k] || S.UNIT_TYPES[k].name) + '×' + count[k]; }).join(' ');
+      var numbers = {};
       // 探索模式的敵軍太多，只列敵將
       var rows = battle.units.filter(function (u) { return u.side === side && (!explore || side === 0 || u.isGeneral); }).map(function (u) {
-        var label = (u.isGeneral || u.named ? u.name : u.name + (++numbers[u.type])) +
+        var label = (u.isGeneral || u.named ? u.name : u.name + (numbers[u.type] = (numbers[u.type] || 0) + 1)) +
           (u.level ? ' <small class="lv">Lv' + u.level + '</small>' : '');
         return '<tr data-id="' + u.id + '"><td class="name">' + label + '</td>' +
           '<td class="hp"></td><td class="mp"></td>' +
@@ -525,6 +535,7 @@
     if (e.code === 'Space') { e.preventDefault(); toggle(); }
     else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { if (!e.repeat) doDash(); }
     else if (e.code === 'KeyF') { if (!e.repeat) doWhirl(); }
+    else if (e.code === 'KeyR') { if (!e.repeat) doRoar(); }
     else if (e.code === 'KeyZ') setStanceKey('tight', true);
     else if (e.code === 'KeyX') setStanceKey('spread', true);
     else if (e.code === 'KeyC') setStanceKey('free', true);

@@ -149,6 +149,15 @@
       // 敵方的計策先出現預警範圍才落下 (玩家可以躲)；玩家的計策立即生效
       if (side === 1) this.telegraphTactic(side, id, tx, ty);
       else this.applyTargetTactic(side, id, tx, ty);
+    } else if (tc.healAll) {                      // 回春：全軍回復兵力、解除燃燒
+      var hpct = tc.healAll.base + army[tc.healAll.from] / tc.healAll.scale;
+      this.alive(side).forEach(function (a) {
+        var amt = Math.round(a.maxHp * hpct);
+        a.hp = Math.min(a.maxHp, a.hp + amt);
+        a.buffs = a.buffs.filter(function (bf) { return bf.kind !== 'burn'; });
+        self.addBurst(a, tc.color);
+        self.addText(a, '+' + amt, tc.color, 0.9);
+      });
     } else if (tc.buff) {
       var b = tc.buff;
       var mul = b.mul + army[b.from] / b.scale;
@@ -186,9 +195,15 @@
     targets.forEach(function (t) {
       if (t.invulnT > 0) return;
       var dmg = self.calcDamage(caster, t, true, power, 0) * (tc.radius > 0 ? self.aoeMul(t) : 1);
+      if (tc.element === 'fire' && S.UNIT_TYPES[t.type].fireWeak) dmg *= S.UNIT_TYPES[t.type].fireWeak;   // 藤甲怕火
       self.applyDamage(t, Math.max(1, Math.round(dmg)), '#e0b0ff');
       if (t.dead) return;
       if (tc.burn) self.applyBurn(caster, t, tc.burn);
+      if (tc.slow) {                              // 水計：緩速並澆熄燃燒
+        self.addBuff(t, { kind: 'slow', t: tc.slow });
+        t.buffs = t.buffs.filter(function (bf) { return bf.kind !== 'burn'; });
+        self.addText(t, S.t('緩速'), '#a0e8ff', 0.9, -0.4);
+      }
       if (tc.stun) {
         self.addBuff(t, { kind: 'stun', t: tc.stun });
         self.addText(t, S.t('混亂'), '#e070ff', 0.9, -0.4);
@@ -339,7 +354,17 @@
     var fighting = allies.filter(engaged).length;
     if (fighting >= 3 && ready('rally') && this.useTactic(side, 'rally')) return;
     var hpRatio = allies.reduce(function (s, a) { return s + a.hp / a.maxHp; }, 0) / allies.length;
-    if (fighting >= 3 && hpRatio < 0.65 && ready('guard')) this.useTactic(side, 'guard');
+    if (hpRatio < 0.5 && allies.length >= 3 && ready('cure') && this.useTactic(side, 'cure')) return;
+    if (fighting >= 3 && hpRatio < 0.65 && ready('guard') && this.useTactic(side, 'guard')) return;
+    // 水計：敵軍擠成一大團時
+    if (pts >= S.TACTICS.flood.cost + 1 && ready('flood')) {
+      var fb = null, fn = 0;
+      enemies.forEach(function (c) {
+        var n = self.tacticTargets(side, 'flood', c.x, c.y).length;
+        if (n > fn) { fn = n; fb = c; }
+      });
+      if (fb && fn >= 4) this.useTactic(side, 'flood', fb.x, fb.y);
+    }
   };
 
   // ======================= 寶箱 =======================

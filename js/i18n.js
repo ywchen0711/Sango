@@ -11,6 +11,8 @@ window.Sango = window.Sango || {};
   var lang = 'zh';
   try {
     var saved = window.localStorage && localStorage.getItem('sango.lang');
+    var fromLobby = (typeof location !== 'undefined' && (location.search.match(/[?&]lang=(zh|en)(?![a-z])/) || [])[1]);   // 從大廳進來：用大廳選的語言
+    if (fromLobby) { saved = fromLobby; localStorage.setItem('sango.lang', saved); }
     if (saved === 'zh' || saved === 'en') lang = saved;
     else if (typeof navigator !== 'undefined' && navigator.language && !/^zh/i.test(navigator.language)) lang = 'en';   // 第一次來：看瀏覽器語言
   } catch (e) { /* Node 模擬或無痕模式：用中文 */ }

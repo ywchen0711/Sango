@@ -5,11 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>三國志 霸王之路</title>
   <!-- 檔案網址後面的 ?v= 是版本號：每次更新上線就改成新的日期，瀏覽器才不會混用快取裡的舊檔案 -->
-  <link rel="stylesheet" href="css/style.css?v=20261009a">
+  <link rel="stylesheet" href="css/style.css?v=20261019a">
 </head>
 <body>
   <main>
     <h1>三國志 霸王的大陸 風格 · 霸王之路</h1>
+    <!-- 兩種玩法：君主模式 (js/ruler.js) / 武將過關 (js/campaign.js) -->
+    <nav id="modes" class="modes"><button data-mode="ruler">👑 君主模式</button><button data-mode="general">⚔ 武將過關</button></nav>
+    <section id="ruler" class="panel ruler" hidden></section>
     <div id="account" class="account"></div>
     <section id="create" class="panel" hidden></section>
     <section id="camp" class="panel" hidden></section>
@@ -89,6 +92,7 @@
   <script src="js/supabase-config.js?v=20261009a"></script>
   <script src="js/account.js?v=20261009a"></script>
   <script src="js/campaign.js?v=20261009a"></script>
+  <script src="js/ruler.js?v=20261019a"></script>
   <script src="/hub.js" data-pos="bottom-left" defer></script>
 </body>
 </html>

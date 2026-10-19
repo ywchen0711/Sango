@@ -508,6 +508,8 @@ window.Sango = window.Sango || {};
 
   // ---- 更多敵人、招式、物品 ----
   Object.assign(S.EN, {
+    // ---- 君主模式 / 武將過關 ----
+    "👑 君主模式": "👑 Ruler Mode", "⚔ 武將過關": "⚔ General Campaign",
     "猛虎": "Tiger",
     "毒蛇": "Viper",
     "藤甲兵": "Rattan Troops",

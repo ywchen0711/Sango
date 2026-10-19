@@ -684,8 +684,8 @@
       '<div class="r-lords">' + rows + '</div>';
     Array.prototype.forEach.call(root.querySelectorAll('.r-lord'), function (b) {
       b.addEventListener('click', function () {
-        if (sv && !sv.over && !window.confirm(L('開始新的遊戲會覆蓋目前的存檔，確定嗎？', 'Starting a new game replaces your saved game. Continue?'))) return;
-        newGame(b.getAttribute('data-lord')); selected = O(G.player).city; flash = pump(); save(); renderPlay();
+        var go = function () { newGame(b.getAttribute('data-lord')); selected = O(G.player).city; flash = pump(); save(); renderPlay(); };
+        if (sv && !sv.over) twice(b, '<b>' + L('再按一次：開始新遊戲', 'Press again to start a new game') + '</b><small>' + L('（會覆蓋目前的存檔）', '(replaces your saved game)') + '</small>', go); else go();
       });
     });
     var cont = document.getElementById('r-continue');
@@ -786,7 +786,7 @@
     on('r-no', 'click', function () { answer(false); });
     on('r-next', 'click', function () { advance(); });
     on('r-new', 'click', function () { try { localStorage.removeItem(KEY); } catch (e) { /* 無妨 */ } renderPick(); });
-    on('r-quit', 'click', function () { if (window.confirm(L('回到選擇君主的畫面？（目前的遊戲已存檔，可以繼續）', 'Back to choosing a ruler? (This game is saved; you can continue it.)'))) { save(); renderPick(); } });
+    on('r-quit', 'click', function (e) { twice(e.currentTarget, L('再按一次回到選君主（已存檔）', 'Press again (game is saved)'), function () { save(); renderPick(); }); });
     on('r-auto', 'change', function (e) { G.settings.auto = e.target.value; flash = flash.concat(pump()); save(); renderPlay(); });
     on('r-askatk', 'change', function (e) { G.settings.askAttack = e.target.checked; flash = flash.concat(pump()); save(); renderPlay(); });
     on('r-adv', 'change', function (e) { G.settings.advance = e.target.checked; save(); renderPlay(); });
@@ -814,6 +814,12 @@
   function scheduleAdvance() {
     stopAdvance();
     if (screen === 'play' && G && !G.over && G.settings.advance && !G.queue.length && isOn()) advTimer = setTimeout(advance, G.settings.speed);
+  }
+  // 需要確認的按鈕：第一次按只換成提示文字，三秒內再按一次才執行 (不用 window.confirm，有些環境不會跳出對話框)
+  function twice(el, ask, fn) {
+    if (el.getAttribute('data-armed')) { fn(); return; }
+    var old = el.innerHTML; el.setAttribute('data-armed', '1'); el.classList.add('r-armed'); el.innerHTML = ask;
+    setTimeout(function () { if (document.body.contains(el)) { el.removeAttribute('data-armed'); el.classList.remove('r-armed'); el.innerHTML = old; } }, 3000);
   }
   function sfx(name) { try { if (S.Sound) S.Sound.play(name); } catch (e) { /* 沒有這個音效也沒關係 */ } }
 

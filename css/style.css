@@ -452,4 +452,5 @@ body.mode-ruler #account, body.mode-ruler #create, body.mode-ruler #camp, body.m
 .r-log li { padding: 2px 0; color: #c8c8d8; } .r-log li small { color: #6a6a7a; margin-right: 6px; }
 .r-log li.good { color: #9ae09a; } .r-log li.bad { color: #ff9a8a; }
 .r-over h3 { font-size: 20px; }
+.r-armed { background: #6a3020 !important; color: #ffe0c8; }
 @media (max-width: 760px) { .r-main { grid-template-columns: 1fr; } }

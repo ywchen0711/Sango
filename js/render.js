@@ -5,11 +5,11 @@
   'use strict';
 
   var FONT = '"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
-  var PANEL_BG = '#f8c4bc';
+  var PANEL_BG = '#5e3e22';
   var BAR_COLORS = ['#58a8f8', '#f86838'];
   // 小地圖的地貌顏色
-  var MINI_COLORS = { '.': [70, 110, 60], '#': [150, 150, 150], '~': [50, 100, 190], 'T': [30, 70, 30], 'f': [45, 90, 40],
-                      's': [90, 100, 55], 'i': [200, 225, 240], 'l': [220, 80, 20] };
+  var MINI_COLORS = { '.': [124, 140, 68], '#': [176, 162, 136], '~': [66, 130, 176], 'T': [78, 122, 46], 'f': [94, 122, 54],
+                      's': [90, 112, 80], 'i': [232, 238, 242], 'l': [224, 96, 32] };
 
   function Renderer(canvas) {
     this.canvas = canvas;
@@ -67,7 +67,7 @@
       return drawTerrain(g, map, cols, rows, rnd, theme), c;
     }
     if (grass) {
-      var GREENS = ['#5c8c3c', '#5a883a', '#60903e', '#56843a', '#5e8a40'];
+      var GREENS = ['#7c8c44', '#788842', '#808f48', '#748440', '#7e8a46'];
       for (var gy = 0; gy < c.height; gy += 8) {
         for (var gx = 0; gx < c.width; gx += 8) {
           g.fillStyle = GREENS[(rnd() * GREENS.length) | 0];
@@ -76,12 +76,15 @@
       }
       for (var k = 0; k < cols * rows * 1.5; k++) {   // 草叢與小花
         var r = rnd();
-        g.fillStyle = r < 0.85 ? '#4a7830' : r < 0.95 ? '#78a050' : '#e8e080';
+        g.fillStyle = r < 0.7 ? '#5e7a2e' : r < 0.82 ? '#94a254' : r < 0.9 ? '#9a7a4a' : ['#f0d040', '#f4f0e0', '#e8808a'][(rnd() * 3) | 0];
         g.fillRect((rnd() * c.width) | 0, (rnd() * c.height) | 0, 1, r < 0.85 ? 2 : 1);
       }
       return drawTerrain(g, map, cols, rows, rnd, theme), c;
     } else {
-      bricks(0, 0, c.width, c.height, ['#a8a8a8', '#a0a0a0', '#a4a4a4', '#b0b0b0', '#a0a0a0', '#8c8c8c'], '#888888');
+      // the battlefield: olive grass with tufts, flowers and bits of earth (the stone walls stand out on it)
+      var FIELD = ['#7c8c44', '#788842', '#808f48', '#748440', '#7e8a46'];
+      for (var fy = 0; fy < c.height; fy += 8) for (var fx = 0; fx < c.width; fx += 8) { g.fillStyle = FIELD[(rnd() * FIELD.length) | 0]; g.fillRect(fx, fy, 8, 8); }
+      for (var gq = 0; gq < cols * rows * 1.6; gq++) { var rq = rnd(); g.fillStyle = rq < 0.7 ? '#5e7a2e' : rq < 0.82 ? '#94a254' : rq < 0.92 ? '#9a7a4a' : ['#f0d040', '#f4f0e0', '#e8808a'][(rnd() * 3) | 0]; g.fillRect((rnd() * c.width) | 0, (rnd() * c.height) | 0, 1, rq < 0.7 ? 2 : 1); }
     }
 
     function wall(x, y) { return x >= 0 && y >= 0 && x < cols && y < rows && map[y][x] === '#'; }
@@ -90,17 +93,17 @@
       for (var tx = 0; tx < cols; tx++) {
         if (!wall(tx, ty)) {
           // 城牆下方的陰影
-          if (wall(tx, ty - 1)) { g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(tx * T, ty * T, T, 4); }
+          if (wall(tx, ty - 1)) { g.fillStyle = 'rgba(46,30,18,0.32)'; g.fillRect(tx * T, ty * T, T, 4); }
           continue;
         }
         var px = tx * T, py = ty * T;
-        bricks(px, py, T, T, ['#d0d0d0', '#c8c8c8', '#d8d8d8'], '#a0a0a0');
-        g.fillStyle = '#202020';
+        bricks(px, py, T, T, ['#e2d2b0', '#d8c8a4', '#e8dabe'], '#b4a07e');
+        g.fillStyle = '#2e1e12';
         if (!wall(tx - 1, ty)) g.fillRect(px, py, 3, T);
         if (!wall(tx + 1, ty)) g.fillRect(px + T - 3, py, 3, T);
         if (!wall(tx, ty - 1) && ty > 0) g.fillRect(px, py, T, 3);
         if (!wall(tx, ty + 1)) g.fillRect(px, py + T - 3, T, 3);
-        g.fillStyle = '#f0f0f0';
+        g.fillStyle = '#fff4dc';
         if (!wall(tx - 1, ty)) g.fillRect(px + 3, py, 1, T);
         if (!wall(tx, ty - 1) && ty > 0) g.fillRect(px, py + 3, T, 1);
       }
@@ -123,8 +126,8 @@
       for (var x = 0; x < cols; x++) {
         var ch = map[y][x], px = x * T, py = y * T;
         if (ch === 'f' || ch === 'T') {
-          g.fillStyle = '#3c6a2c'; g.fillRect(px, py, T, T);
-          speckle(px, py, ['#2e5422', '#46783a', '#335e26'], 10, 2, 2);
+          g.fillStyle = '#647a38'; g.fillRect(px, py, T, T);
+          speckle(px, py, ['#566c2e', '#748a44', '#5e7a2e'], 10, 2, 2);
         } else if (ch === 's') {
           g.fillStyle = '#4e5a34'; g.fillRect(px, py, T, T);
           g.fillStyle = '#3a4a3a'; g.fillRect(px + 2 + ((rnd() * 4) | 0), py + 4 + ((rnd() * 6) | 0), 7, 3);
@@ -136,10 +139,10 @@
           g.fillStyle = '#c83810'; g.fillRect(px, py, T, T);
           speckle(px, py, ['#f88820', '#f8c040', '#801808'], 9, 3, 2);
         } else if (ch === '~') {
-          g.fillStyle = cave ? '#1c3450' : '#2860a8'; g.fillRect(px, py, T, T);
-          speckle(px, py, cave ? ['#2c4a6a'] : ['#4880c8', '#3870b8'], 3, 5, 1);
+          g.fillStyle = cave ? '#1c3450' : '#4282b0'; g.fillRect(px, py, T, T);
+          speckle(px, py, cave ? ['#2c4a6a'] : ['#6aa4cc', '#5c9cc6'], 3, 5, 1);
           // 岸邊
-          g.fillStyle = cave ? '#2a2620' : '#c8b878';
+          g.fillStyle = cave ? '#2a2620' : '#d8c08a';
           if (at(x, y - 1) !== '~' && at(x, y - 1) !== '#') g.fillRect(px, py, T, 2);
           if (at(x, y + 1) !== '~' && at(x, y + 1) !== '#') g.fillRect(px, py + T - 2, T, 2);
           if (at(x - 1, y) !== '~' && at(x - 1, y) !== '#') g.fillRect(px, py, 2, T);
@@ -153,18 +156,19 @@
         ch = map[y][x]; px = x * T; py = y * T;
         if (ch === '#') {
           var top = at(x, y - 1) !== '#', bottom = at(x, y + 1) !== '#';
-          g.fillStyle = cave ? '#2a221c' : '#7a7468'; g.fillRect(px, py, T, T);
-          speckle(px, py, cave ? ['#3a3028', '#201a14'] : ['#8a8478', '#6a6458', '#94907e'], 7, 3, 2);
-          if (top) { g.fillStyle = cave ? '#4a4036' : '#a8a294'; g.fillRect(px, py, T, 3); }
-          if (bottom) { g.fillStyle = cave ? '#14100c' : '#4a463e'; g.fillRect(px, py + T - 4, T, 4); }
+          g.fillStyle = cave ? '#2a221c' : '#9a9282'; g.fillRect(px, py, T, T);
+          speckle(px, py, cave ? ['#3a3028', '#201a14'] : ['#a49c8c', '#8e8676', '#b4ac9c'], 7, 3, 2);
+          if (top) { g.fillStyle = cave ? '#4a4036' : '#c0b8a8'; g.fillRect(px, py, T, 3); }
+          if (bottom) { g.fillStyle = cave ? '#14100c' : '#6e665a'; g.fillRect(px, py + T - 4, T, 4); }
           if (at(x - 1, y) !== '#') { g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(px, py, 2, T); }
           if (bottom && y + 1 < rows) { g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(px, py + T, T, 3); }
         } else if (ch === 'T') {
           g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(px + 8, py + 14, 6, 2, 0, 0, Math.PI * 2); g.fill();
-          g.fillStyle = '#5a3818'; g.fillRect(px + 7, py + 9, 3, 6);
-          g.fillStyle = '#1e4a1a'; g.beginPath(); g.arc(px + 8, py + 6, 6.5, 0, Math.PI * 2); g.fill();
-          g.fillStyle = '#2e6a26'; g.beginPath(); g.arc(px + 7, py + 5, 4.5, 0, Math.PI * 2); g.fill();
-          g.fillStyle = '#4a8a3a'; g.fillRect(px + 5, py + 2, 3, 2);
+          g.fillStyle = '#6a4a2a'; g.fillRect(px + 7, py + 9, 3, 6);
+          g.fillStyle = '#2e1e12'; g.beginPath(); g.arc(px + 8, py + 6, 7.2, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#4e7a2e'; g.beginPath(); g.arc(px + 8, py + 6, 6.3, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#5e8a36'; g.beginPath(); g.arc(px + 7, py + 5, 4.3, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#8aae58'; g.fillRect(px + 5, py + 2, 3, 2);
         }
       }
     }
@@ -721,10 +725,11 @@
   Renderer.prototype.drawPanel = function (battle) {
     var g = this.ctx;
     var y0 = S.FIELD_H;
-    g.fillStyle = PANEL_BG;
+    var pg = g.createLinearGradient(0, y0, 0, y0 + S.PANEL_H); pg.addColorStop(0, '#6e4a2a'); pg.addColorStop(1, '#4f321b');
+    g.fillStyle = pg;
     g.fillRect(0, y0, S.VIEW_W, S.PANEL_H);
-    g.fillStyle = '#d89890';
-    g.fillRect(0, y0, S.VIEW_W, 1);
+    g.fillStyle = '#2e1a0c'; g.fillRect(0, y0, S.VIEW_W, 2);
+    g.fillStyle = '#b8834c'; g.fillRect(0, y0 + 2, S.VIEW_W, 1);
 
     var rows = [[S.t('體'), 'hp'], [S.t('騎'), 'cavalry'], [S.t('弓'), 'archer'], [S.t('步'), 'spear']];
     for (var side = 0; side < 2; side++) {
@@ -732,9 +737,10 @@
       var st = battle.stats(side);
       var px = side === 0 ? 6 : S.VIEW_W - 30;
       var py = y0 + 6;
-      g.fillStyle = '#000';
-      g.fillRect(px - 1, py - 1, 26, 26);
-      g.fillStyle = '#fff8f0';
+      g.fillStyle = '#2e1a0c';
+      g.fillRect(px - 2, py - 2, 28, 28);
+      g.fillStyle = '#b8834c'; g.fillRect(px - 1, py - 1, 26, 26);
+      g.fillStyle = '#fff4dc';
       g.fillRect(px, py, 24, 24);
       g.drawImage(this.portrait(side, army), px, py);
       if (!battle.generalAlive(side)) {
@@ -742,18 +748,18 @@
         g.fillRect(px, py, 24, 24);
         this.text(S.t('敗'), px + 12, py + 12, 12, '#ff5040', 'center', '#000');
       }
-      this.text(army.name, px + 12, y0 + 40, 8, '#202020', 'center', null, 30);
-      this.text(S.t('武') + army.war + S.t(' 統') + army.lead, px + 12, y0 + 53, 5.5, '#604040', 'center');
+      this.text(army.name, px + 12, y0 + 40, 8, '#ffffff', 'center', '#2e1a0c', 30);
+      this.text(S.t('武') + army.war + S.t(' 統') + army.lead, px + 12, y0 + 53, 5.5, '#ffe2a8', 'center', '#2e1a0c');
 
       for (var i = 0; i < rows.length; i++) {
         var ry = y0 + 9 + i * 14;
         var val = String(st[rows[i][1]]);
         if (side === 0) {
-          this.text(rows[i][0], 37, ry, 10, '#202020', 'left');
-          this.text(val, 82, ry, 10, '#202020', 'right');
+          this.text(rows[i][0], 37, ry, 10, '#ffe27a', 'left', '#2e1a0c');
+          this.text(val, 82, ry, 10, '#ffffff', 'right', '#2e1a0c');
         } else {
-          this.text(val, S.VIEW_W - 82, ry, 10, '#202020', 'left');
-          this.text(rows[i][0], S.VIEW_W - 37, ry, 10, '#202020', 'right');
+          this.text(val, S.VIEW_W - 82, ry, 10, '#ffffff', 'left', '#2e1a0c');
+          this.text(rows[i][0], S.VIEW_W - 37, ry, 10, '#ffe27a', 'right', '#2e1a0c');
         }
       }
     }
@@ -762,10 +768,10 @@
     for (side = 0; side < 2; side++) {
       var gx = side === 0 ? 88 : S.VIEW_W - 88 - C.MAX * 3;
       var cmd = battle.generalAlive(side) ? battle.command[side] : 0;
-      this.text(S.t('軍令 ') + Math.floor(cmd), gx + C.MAX * 1.5, y0 + 48, 5.5, '#604040', 'center');
+      this.text(S.t('軍令 ') + Math.floor(cmd), gx + C.MAX * 1.5, y0 + 48, 5.5, '#ffe2a8', 'center', '#2e1a0c');
       for (var c = 0; c < C.MAX; c++) {
         var fill = Math.max(0, Math.min(1, cmd - c));
-        g.fillStyle = '#806060';
+        g.fillStyle = '#3a2410';
         g.fillRect(gx + c * 3, y0 + 54, 2, 5);
         if (fill > 0) {
           g.fillStyle = fill >= 1 ? '#e8b020' : '#c09050';
@@ -774,21 +780,23 @@
       }
     }
     var w = S.WEATHER[battle.weather];
-    this.text(w.name, S.VIEW_W / 2, y0 + 55, 6, battle.weather === 'clear' ? '#806060' : '#2050a0', 'center');
+    this.text(w.name, S.VIEW_W / 2, y0 + 55, 6, battle.weather === 'clear' ? '#ffe2a8' : '#9ad0ff', 'center', '#2e1a0c');
 
     var t = Math.floor(battle.time);
     var mm = String(Math.floor(t / 60)).padStart(2, '0'), ss = String(t % 60).padStart(2, '0');
-    this.text('VS', S.VIEW_W / 2, y0 + 22, 12, '#a03030', 'center');
-    this.text(mm + ':' + ss, S.VIEW_W / 2, y0 + 42, 8, '#404040', 'center');
+    this.text('VS', S.VIEW_W / 2, y0 + 22, 12, '#ffe27a', 'center', '#6a2a10');
+    this.text(mm + ':' + ss, S.VIEW_W / 2, y0 + 42, 8, '#ffffff', 'center', '#2e1a0c');
   };
 
   Renderer.prototype.banner = function (title, sub) {
     var g = this.ctx;
     var cy = S.FIELD_H / 2;
-    g.fillStyle = 'rgba(0,0,0,0.6)';
-    g.fillRect(0, cy - 20, S.VIEW_W, sub ? 40 : 28);
-    this.text(title, S.VIEW_W / 2, cy - (sub ? 6 : 6), 14, '#f8d838', 'center', '#000');
-    if (sub) this.text(sub, S.VIEW_W / 2, cy + 11, 7, '#ffffff', 'center');
+    var h = sub ? 40 : 28;
+    g.fillStyle = 'rgba(110,66,30,0.94)'; g.fillRect(0, cy - 20, S.VIEW_W, h);
+    g.fillStyle = '#2e1a0c'; g.fillRect(0, cy - 21, S.VIEW_W, 1.5); g.fillRect(0, cy - 20 + h - 0.5, S.VIEW_W, 1.5);
+    g.fillStyle = 'rgba(255,220,160,0.25)'; g.fillRect(0, cy - 19, S.VIEW_W, 1);
+    this.text(title, S.VIEW_W / 2, cy - (sub ? 6 : 6), 14, '#ffffff', 'center', '#6a2a10');
+    if (sub) this.text(sub, S.VIEW_W / 2, cy + 11, 7, '#ffe2a8', 'center', '#2e1a0c');
   };
 
   Renderer.prototype.drawOverlay = function (battle, running) {

@@ -386,3 +386,31 @@ button.explore:hover:not(:disabled) { background: #3a6a9a; }
 .lang-btn { position: fixed; top: 8px; right: 8px; z-index: 50; padding: 4px 12px; font-size: 13px; font-weight: bold;
             background: rgba(40, 40, 52, 0.9); border: 1px solid #5a5a70; border-radius: 14px; color: #f8d838; }
 .lang-btn:hover { border-color: #f8d838; }
+
+/* ================================================================ the cheerful wooden theme (Kairosoft-like)
+   wooden frames with a light inner edge, chunky colourful buttons, bold white text with a dark outline */
+:root { --bg: #2c2418; --fg: #fff8ea; --muted: #e6cfa4; --btn: #e2bf7c; --btn-hover: #ecd09a; }
+html { background: #2c2418; }
+body { background: linear-gradient(#3a2c1c, #2c2418) fixed; font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; }
+h1 { font-weight: 900; color: #fff; text-shadow: 2px 0 0 #6a2a10, -2px 0 0 #6a2a10, 0 2px 0 #6a2a10, 0 -2px 0 #6a2a10, 0 4px 0 rgba(0, 0, 0, 0.4); }
+canvas { border: 4px solid #2e1a0c; border-radius: 8px; box-shadow: 0 0 0 3px #b8834c, 0 6px 0 rgba(0, 0, 0, 0.35); }
+button, select { font-weight: 900; color: #3a2410; border: 3px solid #2e1a0c; border-radius: 9px; background: linear-gradient(#fbe8bc, #e2bf7c 55%, #c99a58);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55), inset 0 -3px 0 rgba(0, 0, 0, 0.18), 0 3px 0 rgba(0, 0, 0, 0.35); }
+button:hover:not(:disabled) { background: linear-gradient(#fff0cc, #ecd09a 55%, #d4a868); }
+button:active:not(:disabled) { transform: translateY(2px); }
+button small { color: #6a4a2a; }
+button.primary { color: #fff; text-shadow: 1px 0 0 #1e4a14, -1px 0 0 #1e4a14, 0 1px 0 #1e4a14, 0 -1px 0 #1e4a14; background: linear-gradient(#a6ec7c, #5ec04a 55%, #3a9a2e); border-color: #2e1a0c; }
+button.primary:hover:not(:disabled) { background: linear-gradient(#b8f492, #6cc858 55%, #44a436); }
+button.danger { color: #fff; text-shadow: 1px 0 0 #5a1408, -1px 0 0 #5a1408, 0 1px 0 #5a1408, 0 -1px 0 #5a1408; background: linear-gradient(#ffa27e, #ec6440 55%, #c23e26); border-color: #2e1a0c; }
+.panel:not([hidden]), .result, .box, #roster section { background: linear-gradient(#6e4a2a, #4f321b); border: 3px solid #2e1a0c; border-radius: 12px; padding: 12px 14px;
+  box-shadow: inset 0 0 0 2px #b8834c, 0 4px 0 rgba(0, 0, 0, 0.35); text-shadow: 1px 0 0 #2e1a0c, -1px 0 0 #2e1a0c, 0 1px 0 #2e1a0c, 0 -1px 0 #2e1a0c; }
+.box { background: rgba(255, 236, 200, 0.07); box-shadow: none; border: 2px solid rgba(46, 26, 12, 0.7); }
+.panel h2, .panel h3, .result h2 { color: #ffe27a; font-weight: 900; }
+.stages .stage.cleared { border-color: #5ec04a; }
+.stages .stage.selected { background: linear-gradient(#ffe88a, #e8b440); color: #3a2410; border-color: #2e1a0c; }
+.camp-head .gen b { color: #fff; }
+.camp-head .gold, .msg, .lv { color: #ffe27a; }
+.army tr.hl td { background: rgba(255, 226, 122, 0.18); }
+.army th, .army td { border-bottom-color: rgba(46, 26, 12, 0.6); }
+.panel input, .account input { background: #fff4dc; color: #3a2410; border: 2px solid #2e1a0c; border-radius: 6px; font-weight: 700; }
+.account button { color: #3a2410; }
